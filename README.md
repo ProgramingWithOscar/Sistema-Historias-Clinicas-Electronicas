@@ -1,4 +1,4 @@
-# Sistema-Historias-Clinicas-Eletronicas
+# Sistema Historias Clínicas Eletronicas 🫆
 Proyecto para la gestión de pacientes, citas, diagnósticos y tratamientos.
 Integración con dispositivos IoT
 Alerta de interacciones medicamentosas
