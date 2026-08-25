@@ -38,3 +38,20 @@ Un sistema de HCE moderno debe responder simultáneamente a tres presiones:
 2. **Clínica**: reducir errores mediante soporte a la decisión (alertas de interacciones medicamentosas, alergias, dosis) y aprovechar señales de dispositivos IoT (glucómetros, tensiómetros, oxímetros, wearables) para monitoreo remoto y alertas tempranas.
 3. **Operacional**: unificar gestión de pacientes, agendamiento, diagnósticos, tratamientos y facturación en una sola plataforma con trazabilidad de auditoría.
 
+
+## Estructura
+
+- `backend/` — Laravel 13 (API). Endpoint de prueba: `GET /api/ping`.
+- `frontend/` — Vue 3 + Vite. Llama a `/api/ping` al montar `App.vue`.
+
+## Levantar
+
+```bash
+# terminal 1
+cd backend && php artisan serve      # http://localhost:8000
+
+# terminal 2
+cd frontend && npm install && npm run dev   # http://localhost:5173
+```
+
+Config de conexión: `frontend/.env` → `VITE_API_URL`; `backend/.env` → `FRONTEND_URL` (usado por CORS).
