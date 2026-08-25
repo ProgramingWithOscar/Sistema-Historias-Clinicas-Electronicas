@@ -1,0 +1,15 @@
+**/.git
+**/node_modules
+**/vendor
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/database/database.sqlite
+**/.vscode
+**/.idea
+docker-compose.override.yml
