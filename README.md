@@ -60,3 +60,25 @@ Parámetros como las credenciales de integración con dispositivos IoT, endpoint
 
 *5. Gestor de sesión/autenticación*
 Para cumplir con el control de acceso exigido por la protección de datos sensibles de salud, conviene centralizar la validación de sesiones activas y permisos por rol (médico, enfermero, administrativo) en un único componente.
+
+### Semana 3 - PATRON DE DISEÑO SINGLETON
+
+## ¿ Donde de usa ?
+
+> **Implementación:** el patron singleotn está implementado en la clase `AuditLogger`
+> (`backend/app/Support/Audit/AuditLogger.php`) y se usa desde `AuthController`.
+
+## ¿Para qué se usa?
+
+Para que *todos* los accesos y cambios sobre una historia clínica se registren a
+través de un único componente. Hoy audita el flujo de autenticación
+(`auth.login.succeeded`, `auth.login.failed`, `auth.logout`, `auth.session.read`)
+y guarda cada evento en la tabla `audit_logs`.
+
+## ¿Por qué tiene que ser Singleton?
+
+Porque el logger mantiene dos datos que sólo son correctos si existe una sola
+instancia en toda la petición:
+
+- `requestId`: identificador que agrupa todos los eventos de una misma atención.
+- `sequence`: contador que da el orden cronológico de esos eventos.
