@@ -65,7 +65,7 @@ Para cumplir con el control de acceso exigido por la protección de datos sensib
 
 ## ¿ Donde de usa ?
 
-> **Implementación:** el patron singleotn está implementado en la clase `AuditLogger`
+> **Implementación:** el patron singleton está implementado en la clase `AuditLogger`
 > (`backend/app/Support/Audit/AuditLogger.php`) y se usa desde `AuthController`.
 
 ## ¿Para qué se usa?
