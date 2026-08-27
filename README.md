@@ -63,6 +63,8 @@ Para cumplir con el control de acceso exigido por la protección de datos sensib
 
 ### Semana 3 - PATRON DE DISEÑO SINGLETON
 
+## Link de video explicativo: https://drive.google.com/file/d/15UcTiR7eaimJ0NZa0y0N0Fs_M6TaDz42/view?usp=sharing
+
 ## ¿ Donde de usa ?
 
 > **Implementación:** el patron singleton está implementado en la clase `AuditLogger`
