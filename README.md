@@ -68,6 +68,57 @@ Para cumplir con el control de acceso exigido por la protección de datos sensib
 > **Implementación:** el patron singleton está implementado en la clase `AuditLogger`
 > (`backend/app/Support/Audit/AuditLogger.php`) y se usa desde `AuthController`.
 
+Extracto de `backend/app/Support/Audit/AuditLogger.php`:
+
+```php
+final class AuditLogger
+{
+    /** Única instancia viva del logger en el proceso. */
+    private static ?self $instance = null;
+
+    /** Correlativo compartido por todos los eventos de una misma petición. */
+    private readonly string $requestId;
+
+    /** Orden monotónico de los eventos; sólo tiene sentido si la instancia es única. */
+    private int $sequence = 0;
+
+    /** Privado: nadie fuera de la clase puede hacer `new AuditLogger()`. */
+    private function __construct()
+    {
+        $this->requestId = (string) Str::uuid();
+    }
+
+    /** Único punto de acceso a la instancia. */
+    public static function getInstance(): self
+    {
+        return self::$instance ??= new self;
+    }
+
+    /** Bloquea la clonación: `clone $logger` crearía una segunda instancia. */
+    private function __clone(): void {}
+
+    /** Bloquea la deserialización, la otra vía para duplicar la instancia. */
+    public function __wakeup(): void
+    {
+        throw new \LogicException('AuditLogger es un Singleton y no puede deserializarse.');
+    }
+}
+```
+
+Y así lo consume `AuthController`, sin instanciarlo ni recibirlo por inyección:
+
+```php
+$audit = AuditLogger::getInstance();
+
+$audit->record(
+    action: 'auth.login.succeeded',
+    actorId: $user->id,
+    subjectType: User::class,
+    subjectId: $user->id,
+    request: $request,
+);
+```
+
 ## ¿Para qué se usa?
 
 Para que *todos* los accesos y cambios sobre una historia clínica se registren a
