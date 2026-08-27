@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\AuditOutcome;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'request_id',
     'sequence',
     'action',
+    'outcome',
+    'status_code',
     'actor_id',
     'subject_type',
     'subject_id',
@@ -29,6 +32,7 @@ class AuditLog extends Model
     {
         return [
             'metadata' => 'array',
+            'outcome' => AuditOutcome::class,
             'created_at' => 'datetime',
         ];
     }

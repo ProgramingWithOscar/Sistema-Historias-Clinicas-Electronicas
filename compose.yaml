@@ -35,7 +35,7 @@ services:
       DB_HOST: db
       DB_PORT: 3306
       CACHE_STORE: redis
-      SESSION_DRIVER: redis
+      SESSION_DRIVER: database
       QUEUE_CONNECTION: redis
       REDIS_HOST: redis
       LOG_CHANNEL: stderr
@@ -65,7 +65,7 @@ services:
       DB_HOST: db
       DB_PORT: 3306
       CACHE_STORE: redis
-      SESSION_DRIVER: redis
+      SESSION_DRIVER: database
       QUEUE_CONNECTION: redis
       REDIS_HOST: redis
       LOG_CHANNEL: stderr

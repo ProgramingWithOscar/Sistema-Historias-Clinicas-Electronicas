@@ -81,6 +81,8 @@ final class AuditLogger
      */
     public function record(
         string $action,
+        AuditOutcome $outcome = AuditOutcome::Success,
+        ?int $statusCode = null,
         ?int $actorId = null,
         ?string $subjectType = null,
         ?int $subjectId = null,
@@ -93,6 +95,8 @@ final class AuditLogger
             'request_id' => $this->requestId,
             'sequence' => $this->sequence,
             'action' => $action,
+            'outcome' => $outcome,
+            'status_code' => $statusCode,
             'actor_id' => $actorId,
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
@@ -110,12 +114,17 @@ final class AuditLogger
             // está disponible se degrada al canal de logs, pero se deja rastro.
             Log::error('No se pudo persistir el evento de auditoría', [
                 'action' => $action,
+                'outcome' => $outcome,
+                'status_code' => $statusCode,
                 'request_id' => $this->requestId,
                 'error' => $e->getMessage(),
             ]);
         }
 
-        Log::channel(config('logging.default'))->info("audit.{$action}", $attributes);
+        Log::channel(config('logging.default'))->info(
+            "audit.{$action}",
+            [...$attributes, 'outcome' => $outcome->value],
+        );
 
         return $entry;
     }

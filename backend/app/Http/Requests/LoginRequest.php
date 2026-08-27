@@ -22,4 +22,16 @@ class LoginRequest extends FormRequest
             'device_name' => ['sometimes', 'string', 'max:100'],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.required' => 'El correo es obligatorio.',
+            'email.email' => 'El correo no tiene un formato válido.',
+            'password.required' => 'La contraseña es obligatoria.',
+        ];
+    }
 }
