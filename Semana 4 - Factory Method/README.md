@@ -1,5 +1,7 @@
 # Semana 4 - PATRON DE DISEÑO FACTORY METHOD
 
+## Link de video explicativo: https://drive.google.com/file/d/1lFiXxtjQ45YPVZPrdQzlTTKG5lYu10HB/view?usp=sharing
+
 ## ¿Por qué Factory Method en este proyecto?
 
 El módulo de **monitoreo remoto con dispositivos IoT** recibe lecturas de equipos

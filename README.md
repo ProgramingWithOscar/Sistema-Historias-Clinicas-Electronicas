@@ -170,6 +170,8 @@ la institución y del turno, otro dato conocido sólo en runtime.
 
 ### Semana 4 - PATRON DE DISEÑO FACTORY METHOD
 
+## Link de video explicativo: https://drive.google.com/file/d/1lFiXxtjQ45YPVZPrdQzlTTKG5lYu10HB/view?usp=sharing
+
 ## ¿ Donde de usa ?
 
 > **Implementación:** el patron factory method está implementado en la clase
