@@ -63,6 +63,8 @@ Para cumplir con el control de acceso exigido por la protección de datos sensib
 
 ### Semana 3 - PATRON DE DISEÑO SINGLETON
 
+## Link de video explicativo: https://drive.google.com/file/d/15UcTiR7eaimJ0NZa0y0N0Fs_M6TaDz42/view?usp=sharing
+
 ## ¿ Donde de usa ?
 
 > **Implementación:** el patron singleton está implementado en la clase `AuditLogger`
@@ -133,6 +135,7 @@ instancia en toda la petición:
 
 - `requestId`: identificador que agrupa todos los eventos de una misma atención.
 - `sequence`: contador que da el orden cronológico de esos eventos.
+<<<<<<< HEAD
 ## Patrón de Diseño: Factory Method
 
 ### ¿Por qué Factory Method en este proyecto?
@@ -305,3 +308,5 @@ instancia del `AuditLogger`.
 
 El detalle completo —tabla de roles GoF, ejemplos de request/response y pruebas—
 está en [FACTORY_METHOD.md](FACTORY_METHOD.md).
+=======
+>>>>>>> ef1a763c51b54d374173011762e225091fd0561f
