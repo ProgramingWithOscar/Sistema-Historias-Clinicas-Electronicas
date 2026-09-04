@@ -70,7 +70,8 @@ async function submit() {
   flex-direction: column;
   padding: 32px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
+  background: var(--surface);
   box-shadow: var(--shadow);
   box-sizing: border-box;
 }
@@ -108,7 +109,7 @@ input:focus-visible {
 }
 
 input[aria-invalid='true'] {
-  border-color: #c0392b;
+  border-color: var(--danger);
 }
 
 button {
@@ -135,13 +136,12 @@ button:disabled {
 
 .error {
   margin-top: 16px;
-  font-size: 15px;
-  color: #c0392b;
 }
 
+/* El resto de estilos de error vienen de style.css */
 .field-error {
   margin: -10px 0 12px;
   font-size: 14px;
-  color: #c0392b;
+  color: var(--danger);
 }
 </style>
