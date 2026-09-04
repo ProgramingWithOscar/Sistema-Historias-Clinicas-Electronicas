@@ -135,7 +135,6 @@ instancia en toda la petición:
 
 - `requestId`: identificador que agrupa todos los eventos de una misma atención.
 - `sequence`: contador que da el orden cronológico de esos eventos.
-<<<<<<< HEAD
 ## Patrón de Diseño: Factory Method
 
 ### ¿Por qué Factory Method en este proyecto?
@@ -294,19 +293,3 @@ Además, `ingest()` se declara `final` a propósito: si una subclase pudiera
 reescribir el flujo, podría saltarse el registro de auditoría que exige la
 trazabilidad de la HCEI (Ley 2015 de 2020).
 
-## Relación con el Singleton
-
-Los dos patrones son creacionales y conviven en cada ingesta: la fábrica crea un
-producto nuevo por cada lectura, y ese producto se registra en la *única*
-instancia del `AuditLogger`.
-
-| | Singleton (`AuditLogger`) | Factory Method (`DeviceReadingFactory`) |
-|---|---|---|
-| Cuántos objetos | Exactamente **uno** por proceso | **Muchos**, uno por lectura |
-| Qué resuelve | Garantizar unicidad y orden global | Diferir la elección de la clase concreta |
-| Cómo se obtiene | `AuditLogger::getInstance()` | `$resolver->for($deviceType)` |
-
-El detalle completo —tabla de roles GoF, ejemplos de request/response y pruebas—
-está en [FACTORY_METHOD.md](FACTORY_METHOD.md).
-=======
->>>>>>> ef1a763c51b54d374173011762e225091fd0561f
