@@ -309,7 +309,9 @@ Además, `ingest()` se declara `final` a propósito: si una subclase pudiera
 reescribir el flujo, podría saltarse el registro de auditoría que exige la
 trazabilidad de la HCEI (Ley 2015 de 2020).
 
-## Patrón de Diseño: Abstract Factory
+## Semana 5 - Patrón de Diseño: Abstract Factory
+
+## Link de video explicativo: https://drive.google.com/file/d/1jGST-W9NMR7NJD-gtrFAcefyexD3cucY/view?usp=sharing
 
 ### ¿Por qué Abstract Factory en este proyecto?
 
