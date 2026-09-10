@@ -38,6 +38,20 @@ Un sistema de HCE moderno debe responder simultáneamente a tres presiones:
 2. **Clínica**: reducir errores mediante soporte a la decisión (alertas de interacciones medicamentosas, alergias, dosis) y aprovechar señales de dispositivos IoT (glucómetros, tensiómetros, oxímetros, wearables) para monitoreo remoto y alertas tempranas.
 3. **Operacional**: unificar gestión de pacientes, agendamiento, diagnósticos, tratamientos y facturación en una sola plataforma con trazabilidad de auditoría.
 
+# Objetivos
+
+## Objetivo general
+
+Desarrollar un Sistema de Historias Clínicas Electrónicas que centralice la gestión de pacientes, citas, diagnósticos y tratamientos, integrando el monitoreo remoto con dispositivos IoT y el soporte a la decisión clínica, bajo los estándares de interoperabilidad (HL7 FHIR) y las exigencias de protección de datos sensibles establecidas por la normativa colombiana (Ley 2015 de 2020, Ley 1581 de 2012) y referentes internacionales como HIPAA e ISO 27799.
+
+## Objetivos específicos
+
+1. **Unificar el expediente clínico y su trazabilidad.** Implementar los módulos de gestión de pacientes, agendamiento, diagnósticos y tratamientos sobre un registro único, con auditoría centralizada de todos los accesos y modificaciones a la historia clínica, conforme a la Resolución 1995 de 1999 y la HCEI.
+
+2. **Integrar la ingesta normalizada de dispositivos IoT.** Construir un módulo capaz de recibir lecturas de equipos heterogéneos (glucómetros, tensiómetros, oxímetros) y convertirlas en observaciones clínicas estandarizadas con código LOINC, valor, unidad y severidad, exportables a HL7 FHIR según la Resolución 866 de 2021, de forma extensible a nuevos dispositivos sin modificar el código existente.
+
+3. **Incorporar soporte a la decisión y control de acceso.** Desarrollar un motor de alertas de interacciones medicamentosas y fármaco-alergia, junto con la autenticación y autorización por rol (médico, enfermero, administrativo), para reducir eventos adversos evitables y garantizar el tratamiento reforzado que exige el manejo de datos sensibles de salud.
+
 ## Patrón de Diseño: Singleton
 
 ### ¿Por qué Singleton en este proyecto?
