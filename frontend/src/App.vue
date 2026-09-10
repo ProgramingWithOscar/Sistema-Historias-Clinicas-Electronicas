@@ -4,6 +4,8 @@ import AppShell from './components/AppShell.vue'
 import LoginForm from './components/LoginForm.vue'
 import AuditView from './components/views/AuditView.vue'
 import DeviceReadingsView from './components/views/DeviceReadingsView.vue'
+import EncountersView from './components/views/EncountersView.vue'
+import InteroperabilityView from './components/views/InteroperabilityView.vue'
 import OverviewView from './components/views/OverviewView.vue'
 import SessionsView from './components/views/SessionsView.vue'
 import { useAuth } from './composables/useAuth'
@@ -16,6 +18,8 @@ const { current } = useNavigation()
 const vistas = {
   overview: OverviewView,
   readings: DeviceReadingsView,
+  encounters: EncountersView,
+  interop: InteroperabilityView,
   sessions: SessionsView,
   audit: AuditView,
 }

@@ -24,6 +24,20 @@ const sections = [
     description: 'Lecturas normalizadas por el patrón Factory Method.',
   },
   {
+    id: 'encounters',
+    label: 'Atenciones',
+    icon: 'note',
+    title: 'Notas de atención clínica',
+    description: 'Historias armadas paso a paso por el patrón Builder.',
+  },
+  {
+    id: 'interop',
+    label: 'Interoperabilidad',
+    icon: 'share',
+    title: 'Exportación de la historia clínica',
+    description: 'Documentos de intercambio construidos por el patrón Abstract Factory.',
+  },
+  {
     id: 'sessions',
     label: 'Sesiones',
     icon: 'shield',

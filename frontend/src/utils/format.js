@@ -20,6 +20,15 @@ export const acciones = {
   'auth.logout': 'Cierre de sesión',
   'auth.session.read': 'Lectura de sesión',
   'iot.reading.ingested': 'Lectura IoT recibida',
+  'hce.export.generated': 'Exportación de la HCE',
+  'hce.encounter.created': 'Nota de atención registrada',
+}
+
+/** Tipos de atención que atiende el resolver de directores del backend. */
+export const tiposAtencion = {
+  emergency: 'Urgencias',
+  outpatient_control: 'Control ambulatorio',
+  teleconsultation: 'Teleconsulta',
 }
 
 /** Nombres de los dispositivos que atiende el resolver del backend. */

@@ -51,6 +51,8 @@ const iniciales = (nombre) =>
         <ul class="chips">
           <li>Singleton</li>
           <li>Factory Method</li>
+          <li>Abstract Factory</li>
+          <li>Builder</li>
         </ul>
       </div>
     </aside>
@@ -118,6 +120,14 @@ const iniciales = (nombre) =>
   padding: 20px 16px;
   border-right: 1px solid var(--border);
   background: var(--surface);
+
+  /* Ocupa el alto de la ventana y se queda quieto: el que desplaza es el
+     contenido, no la navegación. */
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .brand {
@@ -164,6 +174,13 @@ nav ul {
   gap: 4px;
 }
 
+/* La navegación nunca se comprime; si la ventana es muy baja, lo que cede es
+   el pie decorativo, no los enlaces. */
+.brand,
+nav {
+  flex: none;
+}
+
 .nav-item {
   width: 100%;
   display: flex;
@@ -193,9 +210,11 @@ nav ul {
 }
 
 .sidebar-foot {
+  flex: 0 1 auto;
   margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+  overflow: hidden;
 }
 
 .patrones {
