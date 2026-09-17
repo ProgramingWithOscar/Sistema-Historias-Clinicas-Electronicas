@@ -764,6 +764,135 @@ calendario, en vez de construir ocho agendamientos desde cero.
 
 ### PATRON DE DISEÑO PROTOTYPE
 
+## Diagrama UML
+
+### Diagrama de clases
+
+```mermaid
+classDiagram
+    direction TB
+
+    class ClinicalPrototype {
+        <<interface>>
+        +copy() ClinicalPrototype
+    }
+
+    class EncounterTemplate {
+        +SECCIONES_NO_HEREDABLES array
+        -key string
+        -name string
+        -type EncounterType
+        -chiefComplaint string
+        -treatmentPlan string
+        -followUpDays int
+        -diagnoses List~DiagnosisDraft~
+        -prescriptions List~PrescriptionDraft~
+        +copy() EncounterTemplate
+        +__clone() void
+        +fromEncounter(encounter, key, name) EncounterTemplate
+        +addDiagnosis(code, description, primary) self
+        +addPrescription(ingredient, dose, frequency, days) self
+        +toPayload() array
+        +toArray() array
+    }
+
+    class DiagnosisDraft {
+        +code string
+        +description string
+        +primary bool
+        +toDiagnosis() Diagnosis
+    }
+
+    class PrescriptionDraft {
+        +activeIngredient string
+        +dose string
+        +frequency string
+        +durationDays int
+        +adjustDose(dose) self
+        +toPrescription() Prescription
+    }
+
+    class TemplateRegistry {
+        -prototypes array
+        +register(prototype) self
+        +get(key) EncounterTemplate
+        +has(key) bool
+        +keys() array
+        +catalog() array
+        -registerBuiltIns() void
+    }
+
+    class TemplateLibrary {
+        +registry() TemplateRegistry
+    }
+
+    class ClinicalTemplate {
+        <<Eloquent>>
+        +fromPrototype(prototype) ClinicalTemplate
+        +toPrototype() EncounterTemplate
+    }
+
+    class ClinicalTemplateController {
+        <<cliente>>
+        +index() JsonResponse
+        +draft(key) JsonResponse
+        +store(request) JsonResponse
+    }
+
+    class StoreClinicalEncounterRequest {
+        <<cliente>>
+        #prepareForValidation() void
+    }
+
+    ClinicalPrototype <|.. EncounterTemplate : implementa
+
+    EncounterTemplate "1" *-- "0..n" DiagnosisDraft : clonado en profundidad
+    EncounterTemplate "1" *-- "0..n" PrescriptionDraft : clonado en profundidad
+
+    TemplateRegistry "1" o-- "0..n" EncounterTemplate : guarda los originales
+    TemplateLibrary ..> TemplateRegistry : compone el catalogo
+    TemplateLibrary ..> ClinicalTemplate : carga las guardadas
+    ClinicalTemplate ..> EncounterTemplate : rehidrata el prototipo
+
+    ClinicalTemplateController ..> TemplateLibrary : pide copias
+    StoreClinicalEncounterRequest ..> TemplateLibrary : rellena huecos
+```
+
+`SECCIONES_NO_HEREDABLES` es una constante de clase: la lista de secciones que
+`fromEncounter()` descarta al clonar una nota real.
+
+Las dos relaciones de **composición** (rombo lleno) son las que importan:
+`DiagnosisDraft` y `PrescriptionDraft` pertenecen a la plantilla y mueren con
+ella, por eso `__clone()` tiene que duplicarlas. La relación con
+`TemplateRegistry` es en cambio una **agregación** (rombo hueco): el registro
+guarda los prototipos pero no los posee en exclusiva —de hecho reparte copias—.
+
+### Diagrama de secuencia: de dónde sale cada copia
+
+```mermaid
+sequenceDiagram
+    actor Medico
+    participant Ctrl as ClinicalTemplateController
+    participant Lib as TemplateLibrary
+    participant Reg as TemplateRegistry
+    participant Proto as EncounterTemplate (original)
+    participant Copia as EncounterTemplate (copia)
+
+    Medico->>Ctrl: GET /encounter-templates/hta_control/draft
+    Ctrl->>Lib: registry()
+    Lib->>Reg: new TemplateRegistry
+    Reg->>Reg: registerBuiltIns()
+    Lib->>Reg: register(plantillas guardadas)
+    Ctrl->>Reg: get('hta_control')
+    Reg->>Proto: copy()
+    Proto->>Proto: __clone()
+    Proto->>Copia: clona DiagnosisDraft y PrescriptionDraft
+    Reg-->>Ctrl: copia independiente
+    Ctrl-->>Medico: payload del borrador
+
+    Note over Proto,Copia: El original nunca sale del registro:<br/>ajustar la copia no puede alcanzarlo
+```
+
 ## ¿ Donde de usa ?
 
 > **Implementación:** el patrón prototype está implementado en la interfaz
