@@ -17,6 +17,107 @@ desde una estructura ya configurada en lugar de desde una página en blanco.
 | Persistencia | `backend/app/Models/ClinicalTemplate.php` + migración `create_clinical_templates_table` |
 | Pruebas del patrón | `backend/tests/Unit/EncounterTemplatePrototypeTest.php`, `backend/tests/Feature/ClinicalTemplateTest.php` |
 
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class ClinicalPrototype {
+        <<interface>>
+        +copy() ClinicalPrototype
+    }
+
+    class EncounterTemplate {
+        +SECCIONES_NO_HEREDABLES array
+        -key string
+        -name string
+        -type EncounterType
+        -chiefComplaint string
+        -treatmentPlan string
+        -followUpDays int
+        -diagnoses List~DiagnosisDraft~
+        -prescriptions List~PrescriptionDraft~
+        +copy() EncounterTemplate
+        +__clone() void
+        +fromEncounter(encounter, key, name) EncounterTemplate
+        +addDiagnosis(code, description, primary) self
+        +addPrescription(ingredient, dose, frequency, days) self
+        +toPayload() array
+        +toArray() array
+    }
+
+    class DiagnosisDraft {
+        +code string
+        +description string
+        +primary bool
+        +toDiagnosis() Diagnosis
+    }
+
+    class PrescriptionDraft {
+        +activeIngredient string
+        +dose string
+        +frequency string
+        +durationDays int
+        +adjustDose(dose) self
+        +toPrescription() Prescription
+    }
+
+    class TemplateRegistry {
+        -prototypes array
+        +register(prototype) self
+        +get(key) EncounterTemplate
+        +has(key) bool
+        +keys() array
+        +catalog() array
+        -registerBuiltIns() void
+    }
+
+    class TemplateLibrary {
+        +registry() TemplateRegistry
+    }
+
+    class ClinicalTemplate {
+        <<Eloquent>>
+        +fromPrototype(prototype) ClinicalTemplate
+        +toPrototype() EncounterTemplate
+    }
+
+    class ClinicalTemplateController {
+        <<cliente>>
+        +index() JsonResponse
+        +draft(key) JsonResponse
+        +store(request) JsonResponse
+    }
+
+    class StoreClinicalEncounterRequest {
+        <<cliente>>
+        #prepareForValidation() void
+    }
+
+    ClinicalPrototype <|.. EncounterTemplate : implementa
+
+    EncounterTemplate "1" *-- "0..n" DiagnosisDraft : clonado en profundidad
+    EncounterTemplate "1" *-- "0..n" PrescriptionDraft : clonado en profundidad
+
+    TemplateRegistry "1" o-- "0..n" EncounterTemplate : guarda los originales
+    TemplateLibrary ..> TemplateRegistry : compone el catalogo
+    TemplateLibrary ..> ClinicalTemplate : carga las guardadas
+    ClinicalTemplate ..> EncounterTemplate : rehidrata el prototipo
+
+    ClinicalTemplateController ..> TemplateLibrary : pide copias
+    StoreClinicalEncounterRequest ..> TemplateLibrary : rellena huecos
+```
+
+`SECCIONES_NO_HEREDABLES` es una constante de clase: la lista de secciones que
+`fromEncounter()` descarta al clonar una nota real.
+
+Las dos relaciones de **composición** (rombo lleno) son las que importan:
+`DiagnosisDraft` y `PrescriptionDraft` pertenecen a la plantilla y mueren con
+ella, por eso `__clone()` tiene que duplicarlas. La relación con
+`TemplateRegistry` es en cambio una **agregación** (rombo hueco): el registro
+guarda los prototipos pero no los posee en exclusiva —de hecho reparte copias—.
+
 ## El núcleo del patrón
 
 `copy()` es la operación del patrón; `__clone()` es donde se decide qué

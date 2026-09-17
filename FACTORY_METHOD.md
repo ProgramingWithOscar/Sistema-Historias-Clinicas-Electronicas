@@ -17,6 +17,107 @@ oxímetros).
 | Persistencia | `backend/app/Models/DeviceReading.php` + migración `create_device_readings_table` |
 | Pruebas del patrón | `backend/tests/Unit/DeviceReadingFactoryTest.php`, `backend/tests/Feature/DeviceReadingIngestionTest.php` |
 
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class DeviceReadingFactory {
+        <<abstract>>
+        +ingest(payload, patientId, request) DeviceReading
+        #makeReading(payload) ClinicalReading
+        +deviceType() string
+        +payloadRules() array
+        -validate(payload) void
+    }
+
+    class GlucometerFactory {
+        +deviceType() string
+        +payloadRules() array
+        #makeReading(payload) ClinicalReading
+    }
+    class SphygmomanometerFactory {
+        +deviceType() string
+        +payloadRules() array
+        #makeReading(payload) ClinicalReading
+    }
+    class PulseOximeterFactory {
+        +deviceType() string
+        +payloadRules() array
+        #makeReading(payload) ClinicalReading
+    }
+
+    class ClinicalReading {
+        <<interface>>
+        +loincCode() string
+        +display() string
+        +value() float
+        +unit() string
+        +severity() ReadingSeverity
+        +components() array
+    }
+
+    class GlucoseReading {
+        -mgPerDl float
+        -fasting bool
+    }
+    class BloodPressureReading {
+        -systolic float
+        -diastolic float
+        -pulse int
+    }
+    class OxygenSaturationReading {
+        -spo2 float
+        -pulse int
+    }
+
+    class ReadingSeverity {
+        <<enumeration>>
+        Normal
+        Warning
+        Critical
+        +label() string
+        +requiresAttention() bool
+    }
+
+    class DeviceReadingFactoryResolver {
+        -FACTORIES array
+        +for(deviceType) DeviceReadingFactory
+        +supportedDevices() array
+    }
+
+    class DeviceReadingController {
+        <<cliente>>
+        +store(request) JsonResponse
+    }
+
+    DeviceReadingFactory <|-- GlucometerFactory
+    DeviceReadingFactory <|-- SphygmomanometerFactory
+    DeviceReadingFactory <|-- PulseOximeterFactory
+
+    ClinicalReading <|.. GlucoseReading
+    ClinicalReading <|.. BloodPressureReading
+    ClinicalReading <|.. OxygenSaturationReading
+
+    DeviceReadingFactory ..> ClinicalReading : makeReading() devuelve
+    GlucometerFactory ..> GlucoseReading : crea
+    SphygmomanometerFactory ..> BloodPressureReading : crea
+    PulseOximeterFactory ..> OxygenSaturationReading : crea
+
+    ClinicalReading ..> ReadingSeverity : interpreta
+    DeviceReadingFactoryResolver ..> DeviceReadingFactory : elige en runtime
+    DeviceReadingController ..> DeviceReadingFactoryResolver : for(device_type)
+```
+
+La línea punteada de `DeviceReadingFactory` a `ClinicalReading` es la clave: el
+creador depende de la **abstracción** del producto, nunca de las clases
+concretas. Quien decide cuál instanciar es cada subclase en `makeReading()`, el
+método fábrica.
+
+`ingest()` es `final` y `makeReading()` es abstracto: el flujo lo fija la
+superclase, la elección del producto la delega.
+
 ## El núcleo del patrón
 
 El creador define el flujo completo de ingesta, pero **no decide qué lectura se

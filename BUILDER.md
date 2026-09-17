@@ -20,6 +20,126 @@ historia clínica electrónica.
 | Persistencia | `backend/app/Models/ClinicalEncounter.php` + migración `create_clinical_encounters_table` |
 | Pruebas del patrón | `backend/tests/Unit/ClinicalNoteBuilderTest.php`, `backend/tests/Feature/ClinicalEncounterTest.php` |
 
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class EncounterDirector {
+        <<abstract>>
+        +construct(payload, patient, professional) ClinicalNote
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+        #recentReadings(patient, limit) Collection
+    }
+
+    class EmergencyEncounterDirector {
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+    }
+    class OutpatientControlDirector {
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+    }
+    class TeleconsultationDirector {
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+    }
+
+    class ClinicalNoteBuilder {
+        -type EncounterType
+        -patientId int
+        -diagnoses List~Diagnosis~
+        -prescriptions List~Prescription~
+        -vitalSigns array
+        +ofType(type) self
+        +forPatient(patient) self
+        +attendedBy(professional, license) self
+        +at(moment) self
+        +withChiefComplaint(complaint) self
+        +withPresentIllness(illness) self
+        +withHistory(history) self
+        +withPhysicalExam(findings) self
+        +withDeviceReadings(readings) self
+        +addDiagnosis(cie10, description, primary) self
+        +withTreatmentPlan(plan) self
+        +addPrescription(ingredient, dose, frequency, days) self
+        +withTriage(level) self
+        +withFollowUp(date) self
+        +withMetadata(metadata) self
+        +build() ClinicalNote
+        -missingSections() array
+    }
+
+    class ClinicalNote {
+        <<producto inmutable>>
+        -__construct() void
+        +type EncounterType
+        +patientId int
+        +diagnoses List~Diagnosis~
+        +prescriptions List~Prescription~
+        +triage TriageLevel
+        +fromBuilder(parts) ClinicalNote
+        +primaryDiagnosis() Diagnosis
+        +toArray() array
+    }
+
+    class Diagnosis {
+        +code string
+        +description string
+        +primary bool
+    }
+    class Prescription {
+        +activeIngredient string
+        +dose string
+        +frequency string
+        +durationDays int
+    }
+
+    class IncompleteClinicalNoteException {
+        +missing array
+        +render(request) JsonResponse
+    }
+
+    class EncounterDirectorResolver {
+        +for(encounterType) EncounterDirector
+        +supportedTypes() array
+        +catalog() array
+    }
+
+    class ClinicalEncounterController {
+        <<cliente>>
+        +store(request) JsonResponse
+    }
+
+    EncounterDirector <|-- EmergencyEncounterDirector
+    EncounterDirector <|-- OutpatientControlDirector
+    EncounterDirector <|-- TeleconsultationDirector
+
+    EncounterDirector ..> ClinicalNoteBuilder : dirige los pasos
+    ClinicalNoteBuilder ..> ClinicalNote : build() entrega
+    ClinicalNoteBuilder ..> IncompleteClinicalNoteException : build() aborta
+
+    ClinicalNote "1" *-- "1..n" Diagnosis
+    ClinicalNote "1" *-- "0..n" Prescription
+
+    EncounterDirectorResolver ..> EncounterDirector : elige en runtime
+    ClinicalEncounterController ..> EncounterDirectorResolver : for(encounter_type)
+```
+
+El reparto de responsabilidades se lee directo en el diagrama: el **director**
+no toca el producto —sólo llama al builder—, el **builder** es el único que crea
+la `ClinicalNote`, y el **producto** no conoce a ninguno de los dos.
+
+`ClinicalNote` tiene el constructor **privado** y todas sus propiedades de sólo
+lectura: la única salida del builder es `build()`, y de ahí sale una nota
+completa o no sale nada (`IncompleteClinicalNoteException`).
+
 ## El núcleo del patrón
 
 Cada paso añade una parte y devuelve `$this`; `build()` cierra la construcción

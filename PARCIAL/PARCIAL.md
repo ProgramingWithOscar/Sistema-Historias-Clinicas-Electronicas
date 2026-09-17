@@ -79,6 +79,75 @@ Para cumplir con el control de acceso exigido por la protección de datos sensib
 
 ## Link de video explicativo: https://drive.google.com/file/d/15UcTiR7eaimJ0NZa0y0N0Fs_M6TaDz42/view?usp=sharing
 
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class AuditLogger {
+        -instance AuditLogger
+        -requestId string
+        -sequence int
+        -__construct() void
+        +getInstance() AuditLogger
+        -__clone() void
+        +__wakeup() void
+        +resetInstance() void
+        +requestId() string
+        +eventCount() int
+        +record(action, outcome, actorId, subjectType, subjectId, metadata, request) AuditLog
+    }
+
+    class AuditOutcome {
+        <<enumeration>>
+        Success
+        Failure
+        Denied
+        +label() string
+    }
+
+    class AuditLog {
+        <<Eloquent>>
+        +request_id string
+        +sequence int
+        +action string
+        +outcome AuditOutcome
+        +metadata array
+        +actor() BelongsTo
+    }
+
+    class AuthController {
+        <<cliente>>
+    }
+    class DeviceReadingFactory {
+        <<cliente>>
+    }
+    class ClinicalRecordExporter {
+        <<cliente>>
+    }
+    class ClinicalEncounterController {
+        <<cliente>>
+    }
+
+    AuditLogger --> AuditLog : persiste eventos
+    AuditLog --> AuditOutcome : clasifica
+
+    AuthController ..> AuditLogger : getInstance()
+    DeviceReadingFactory ..> AuditLogger : getInstance()
+    ClinicalRecordExporter ..> AuditLogger : getInstance()
+    ClinicalEncounterController ..> AuditLogger : getInstance()
+```
+
+`instance`, `getInstance()` y `resetInstance()` son **estáticos**. Las tres
+puertas de entrada están cerradas a propósito: `__construct()` y `__clone()` son
+privados y `__wakeup()` lanza excepción, de modo que no hay forma de obtener una
+segunda instancia ni por `new`, ni por `clone`, ni deserializando.
+
+Nótese que ningún cliente recibe el logger por inyección: todos lo piden con
+`getInstance()`, que es justo lo que garantiza que `requestId` y `sequence` sean
+los mismos para toda la petición.
+
 ## ¿ Donde de usa ?
 
 > **Implementación:** el patron singleton está implementado en la clase `AuditLogger`
@@ -185,6 +254,107 @@ la institución y del turno, otro dato conocido sólo en runtime.
 ### Semana 4 - PATRON DE DISEÑO FACTORY METHOD
 
 ## Link de video explicativo: https://drive.google.com/file/d/1lFiXxtjQ45YPVZPrdQzlTTKG5lYu10HB/view?usp=sharing
+
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class DeviceReadingFactory {
+        <<abstract>>
+        +ingest(payload, patientId, request) DeviceReading
+        #makeReading(payload) ClinicalReading
+        +deviceType() string
+        +payloadRules() array
+        -validate(payload) void
+    }
+
+    class GlucometerFactory {
+        +deviceType() string
+        +payloadRules() array
+        #makeReading(payload) ClinicalReading
+    }
+    class SphygmomanometerFactory {
+        +deviceType() string
+        +payloadRules() array
+        #makeReading(payload) ClinicalReading
+    }
+    class PulseOximeterFactory {
+        +deviceType() string
+        +payloadRules() array
+        #makeReading(payload) ClinicalReading
+    }
+
+    class ClinicalReading {
+        <<interface>>
+        +loincCode() string
+        +display() string
+        +value() float
+        +unit() string
+        +severity() ReadingSeverity
+        +components() array
+    }
+
+    class GlucoseReading {
+        -mgPerDl float
+        -fasting bool
+    }
+    class BloodPressureReading {
+        -systolic float
+        -diastolic float
+        -pulse int
+    }
+    class OxygenSaturationReading {
+        -spo2 float
+        -pulse int
+    }
+
+    class ReadingSeverity {
+        <<enumeration>>
+        Normal
+        Warning
+        Critical
+        +label() string
+        +requiresAttention() bool
+    }
+
+    class DeviceReadingFactoryResolver {
+        -FACTORIES array
+        +for(deviceType) DeviceReadingFactory
+        +supportedDevices() array
+    }
+
+    class DeviceReadingController {
+        <<cliente>>
+        +store(request) JsonResponse
+    }
+
+    DeviceReadingFactory <|-- GlucometerFactory
+    DeviceReadingFactory <|-- SphygmomanometerFactory
+    DeviceReadingFactory <|-- PulseOximeterFactory
+
+    ClinicalReading <|.. GlucoseReading
+    ClinicalReading <|.. BloodPressureReading
+    ClinicalReading <|.. OxygenSaturationReading
+
+    DeviceReadingFactory ..> ClinicalReading : makeReading() devuelve
+    GlucometerFactory ..> GlucoseReading : crea
+    SphygmomanometerFactory ..> BloodPressureReading : crea
+    PulseOximeterFactory ..> OxygenSaturationReading : crea
+
+    ClinicalReading ..> ReadingSeverity : interpreta
+    DeviceReadingFactoryResolver ..> DeviceReadingFactory : elige en runtime
+    DeviceReadingController ..> DeviceReadingFactoryResolver : for(device_type)
+```
+
+La línea punteada de `DeviceReadingFactory` a `ClinicalReading` es la clave: el
+creador depende de la **abstracción** del producto, nunca de las clases
+concretas. Quien decide cuál instanciar es cada subclase en `makeReading()`, el
+método fábrica.
+
+`ingest()` es `final` y `makeReading()` es abstracto: el flujo lo fija la
+superclase, la elección del producto la delega.
 
 ## ¿ Donde de usa ?
 
@@ -355,6 +525,119 @@ política de retención (ISO 27799). Una llave de producción con la retención 
 pruebas borraría historias que la Res. 1995 de 1999 obliga a conservar.
 
 ### PATRON DE DISEÑO ABSTRACT FACTORY
+
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class ClinicalExchangeFactory {
+        <<interface>>
+        +standard() ExchangeStandard
+        +createPatientSerializer() PatientSerializer
+        +createObservationSerializer() ObservationSerializer
+        +createEnvelope() ExchangeEnvelope
+    }
+
+    class FhirR4ExchangeFactory
+    class RdaExchangeFactory
+    class AnonymizedExchangeFactory
+
+    class PatientSerializer {
+        <<interface>>
+        +serialize(patient) array
+        +reference(patient) string
+    }
+    class ObservationSerializer {
+        <<interface>>
+        +serialize(reading, patientReference) array
+    }
+    class ExchangeEnvelope {
+        <<interface>>
+        +assemble(patient, observations, generatedAt) array
+        +mediaType() string
+        +filename(generatedAt) string
+    }
+
+    class FhirPatientSerializer
+    class FhirObservationSerializer
+    class FhirBundleEnvelope
+
+    class RdaPatientSerializer
+    class RdaObservationSerializer
+    class RdaDocumentEnvelope
+
+    class AnonymizedPatientSerializer
+    class AnonymizedObservationSerializer
+    class AnonymizedDatasetEnvelope
+
+    class ExchangeStandard {
+        <<enumeration>>
+        FhirR4
+        Rda
+        Anonymized
+        +label() string
+        +legalBasis() string
+        +identifiesPatient() bool
+    }
+
+    class ClinicalExchangeFactoryResolver {
+        +for(standard) ClinicalExchangeFactory
+        +supportedStandards() array
+        +catalog() array
+    }
+
+    class ClinicalRecordExporter {
+        <<cliente>>
+        -factory ClinicalExchangeFactory
+        +export(patient, request, limit) array
+    }
+
+    ClinicalExchangeFactory <|.. FhirR4ExchangeFactory
+    ClinicalExchangeFactory <|.. RdaExchangeFactory
+    ClinicalExchangeFactory <|.. AnonymizedExchangeFactory
+
+    PatientSerializer <|.. FhirPatientSerializer
+    PatientSerializer <|.. RdaPatientSerializer
+    PatientSerializer <|.. AnonymizedPatientSerializer
+
+    ObservationSerializer <|.. FhirObservationSerializer
+    ObservationSerializer <|.. RdaObservationSerializer
+    ObservationSerializer <|.. AnonymizedObservationSerializer
+
+    ExchangeEnvelope <|.. FhirBundleEnvelope
+    ExchangeEnvelope <|.. RdaDocumentEnvelope
+    ExchangeEnvelope <|.. AnonymizedDatasetEnvelope
+
+    FhirR4ExchangeFactory ..> FhirPatientSerializer : crea
+    FhirR4ExchangeFactory ..> FhirObservationSerializer : crea
+    FhirR4ExchangeFactory ..> FhirBundleEnvelope : crea
+
+    RdaExchangeFactory ..> RdaPatientSerializer : crea
+    RdaExchangeFactory ..> RdaObservationSerializer : crea
+    RdaExchangeFactory ..> RdaDocumentEnvelope : crea
+
+    AnonymizedExchangeFactory ..> AnonymizedPatientSerializer : crea
+    AnonymizedExchangeFactory ..> AnonymizedObservationSerializer : crea
+    AnonymizedExchangeFactory ..> AnonymizedDatasetEnvelope : crea
+
+    ClinicalExchangeFactory ..> ExchangeStandard : identifica familia
+    ClinicalExchangeFactoryResolver ..> ClinicalExchangeFactory : elige en runtime
+    ClinicalRecordExporter --> ClinicalExchangeFactory : usa
+    ClinicalRecordExporter ..> PatientSerializer : usa
+    ClinicalRecordExporter ..> ObservationSerializer : usa
+    ClinicalRecordExporter ..> ExchangeEnvelope : usa
+```
+
+Se ven las **tres columnas de productos** —paciente, observaciones y sobre— y las
+**tres filas de familias** —FHIR, RDA y anonimizada—. Cada fábrica concreta crea
+exactamente una pieza de cada columna, y ésa es la garantía del patrón: al pedir
+los tres productos a la misma fábrica, las piezas de dos familias distintas no
+pueden mezclarse.
+
+`ClinicalRecordExporter` sólo conoce las cuatro interfaces de la izquierda: no
+nombra ni una sola clase concreta.
 
 ## ¿ Donde de usa ?
 
@@ -536,6 +819,126 @@ interacciones sobre el conjunto completo —no fármaco a fármaco— es el mism
 esquema: la validación pertenece al cierre, no a cada paso.
 
 ### PATRON DE DISEÑO BUILDER
+
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class EncounterDirector {
+        <<abstract>>
+        +construct(payload, patient, professional) ClinicalNote
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+        #recentReadings(patient, limit) Collection
+    }
+
+    class EmergencyEncounterDirector {
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+    }
+    class OutpatientControlDirector {
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+    }
+    class TeleconsultationDirector {
+        +type() EncounterType
+        +payloadRules() array
+        #assembleSpecificSections(builder, payload, patient) void
+    }
+
+    class ClinicalNoteBuilder {
+        -type EncounterType
+        -patientId int
+        -diagnoses List~Diagnosis~
+        -prescriptions List~Prescription~
+        -vitalSigns array
+        +ofType(type) self
+        +forPatient(patient) self
+        +attendedBy(professional, license) self
+        +at(moment) self
+        +withChiefComplaint(complaint) self
+        +withPresentIllness(illness) self
+        +withHistory(history) self
+        +withPhysicalExam(findings) self
+        +withDeviceReadings(readings) self
+        +addDiagnosis(cie10, description, primary) self
+        +withTreatmentPlan(plan) self
+        +addPrescription(ingredient, dose, frequency, days) self
+        +withTriage(level) self
+        +withFollowUp(date) self
+        +withMetadata(metadata) self
+        +build() ClinicalNote
+        -missingSections() array
+    }
+
+    class ClinicalNote {
+        <<producto inmutable>>
+        -__construct() void
+        +type EncounterType
+        +patientId int
+        +diagnoses List~Diagnosis~
+        +prescriptions List~Prescription~
+        +triage TriageLevel
+        +fromBuilder(parts) ClinicalNote
+        +primaryDiagnosis() Diagnosis
+        +toArray() array
+    }
+
+    class Diagnosis {
+        +code string
+        +description string
+        +primary bool
+    }
+    class Prescription {
+        +activeIngredient string
+        +dose string
+        +frequency string
+        +durationDays int
+    }
+
+    class IncompleteClinicalNoteException {
+        +missing array
+        +render(request) JsonResponse
+    }
+
+    class EncounterDirectorResolver {
+        +for(encounterType) EncounterDirector
+        +supportedTypes() array
+        +catalog() array
+    }
+
+    class ClinicalEncounterController {
+        <<cliente>>
+        +store(request) JsonResponse
+    }
+
+    EncounterDirector <|-- EmergencyEncounterDirector
+    EncounterDirector <|-- OutpatientControlDirector
+    EncounterDirector <|-- TeleconsultationDirector
+
+    EncounterDirector ..> ClinicalNoteBuilder : dirige los pasos
+    ClinicalNoteBuilder ..> ClinicalNote : build() entrega
+    ClinicalNoteBuilder ..> IncompleteClinicalNoteException : build() aborta
+
+    ClinicalNote "1" *-- "1..n" Diagnosis
+    ClinicalNote "1" *-- "0..n" Prescription
+
+    EncounterDirectorResolver ..> EncounterDirector : elige en runtime
+    ClinicalEncounterController ..> EncounterDirectorResolver : for(encounter_type)
+```
+
+El reparto de responsabilidades se lee directo en el diagrama: el **director**
+no toca el producto —sólo llama al builder—, el **builder** es el único que crea
+la `ClinicalNote`, y el **producto** no conoce a ninguno de los dos.
+
+`ClinicalNote` tiene el constructor **privado** y todas sus propiedades de sólo
+lectura: la única salida del builder es `build()`, y de ahí sale una nota
+completa o no sale nada (`IncompleteClinicalNoteException`).
 
 ## ¿ Donde de usa ?
 
@@ -764,6 +1167,107 @@ calendario, en vez de construir ocho agendamientos desde cero.
 
 ### PATRON DE DISEÑO PROTOTYPE
 
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class ClinicalPrototype {
+        <<interface>>
+        +copy() ClinicalPrototype
+    }
+
+    class EncounterTemplate {
+        +SECCIONES_NO_HEREDABLES array
+        -key string
+        -name string
+        -type EncounterType
+        -chiefComplaint string
+        -treatmentPlan string
+        -followUpDays int
+        -diagnoses List~DiagnosisDraft~
+        -prescriptions List~PrescriptionDraft~
+        +copy() EncounterTemplate
+        +__clone() void
+        +fromEncounter(encounter, key, name) EncounterTemplate
+        +addDiagnosis(code, description, primary) self
+        +addPrescription(ingredient, dose, frequency, days) self
+        +toPayload() array
+        +toArray() array
+    }
+
+    class DiagnosisDraft {
+        +code string
+        +description string
+        +primary bool
+        +toDiagnosis() Diagnosis
+    }
+
+    class PrescriptionDraft {
+        +activeIngredient string
+        +dose string
+        +frequency string
+        +durationDays int
+        +adjustDose(dose) self
+        +toPrescription() Prescription
+    }
+
+    class TemplateRegistry {
+        -prototypes array
+        +register(prototype) self
+        +get(key) EncounterTemplate
+        +has(key) bool
+        +keys() array
+        +catalog() array
+        -registerBuiltIns() void
+    }
+
+    class TemplateLibrary {
+        +registry() TemplateRegistry
+    }
+
+    class ClinicalTemplate {
+        <<Eloquent>>
+        +fromPrototype(prototype) ClinicalTemplate
+        +toPrototype() EncounterTemplate
+    }
+
+    class ClinicalTemplateController {
+        <<cliente>>
+        +index() JsonResponse
+        +draft(key) JsonResponse
+        +store(request) JsonResponse
+    }
+
+    class StoreClinicalEncounterRequest {
+        <<cliente>>
+        #prepareForValidation() void
+    }
+
+    ClinicalPrototype <|.. EncounterTemplate : implementa
+
+    EncounterTemplate "1" *-- "0..n" DiagnosisDraft : clonado en profundidad
+    EncounterTemplate "1" *-- "0..n" PrescriptionDraft : clonado en profundidad
+
+    TemplateRegistry "1" o-- "0..n" EncounterTemplate : guarda los originales
+    TemplateLibrary ..> TemplateRegistry : compone el catalogo
+    TemplateLibrary ..> ClinicalTemplate : carga las guardadas
+    ClinicalTemplate ..> EncounterTemplate : rehidrata el prototipo
+
+    ClinicalTemplateController ..> TemplateLibrary : pide copias
+    StoreClinicalEncounterRequest ..> TemplateLibrary : rellena huecos
+```
+
+`SECCIONES_NO_HEREDABLES` es una constante de clase: la lista de secciones que
+`fromEncounter()` descarta al clonar una nota real.
+
+Las dos relaciones de **composición** (rombo lleno) son las que importan:
+`DiagnosisDraft` y `PrescriptionDraft` pertenecen a la plantilla y mueren con
+ella, por eso `__clone()` tiene que duplicarlas. La relación con
+`TemplateRegistry` es en cambio una **agregación** (rombo hueco): el registro
+guarda los prototipos pero no los posee en exclusiva —de hecho reparte copias—.
+
 ## ¿ Donde de usa ?
 
 > **Implementación:** el patrón prototype está implementado en la interfaz
@@ -910,5 +1414,6 @@ patrones creacionales anteriores resuelve eso:
   `CrisisHipertensivaFactory`… Con él, dar de alta una plantilla es registrar un
   objeto, no escribir código — y por eso el propio médico puede crear las suyas
   desde la interfaz, algo imposible si cada plantilla fuera una clase.
+
 
 

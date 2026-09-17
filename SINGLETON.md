@@ -12,7 +12,76 @@ de uso 2 descrito en el README (*gestor de auditoría / logging clínico*).
 | Enlace con el contenedor de Laravel | `backend/app/Providers/AppServiceProvider.php` |
 | Pruebas que verifican el patrón | `backend/tests/Unit/AuditLoggerSingletonTest.php` |
 
-### El núcleo del patrón
+### Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class AuditLogger {
+        -instance AuditLogger
+        -requestId string
+        -sequence int
+        -__construct() void
+        +getInstance() AuditLogger
+        -__clone() void
+        +__wakeup() void
+        +resetInstance() void
+        +requestId() string
+        +eventCount() int
+        +record(action, outcome, actorId, subjectType, subjectId, metadata, request) AuditLog
+    }
+
+    class AuditOutcome {
+        <<enumeration>>
+        Success
+        Failure
+        Denied
+        +label() string
+    }
+
+    class AuditLog {
+        <<Eloquent>>
+        +request_id string
+        +sequence int
+        +action string
+        +outcome AuditOutcome
+        +metadata array
+        +actor() BelongsTo
+    }
+
+    class AuthController {
+        <<cliente>>
+    }
+    class DeviceReadingFactory {
+        <<cliente>>
+    }
+    class ClinicalRecordExporter {
+        <<cliente>>
+    }
+    class ClinicalEncounterController {
+        <<cliente>>
+    }
+
+    AuditLogger --> AuditLog : persiste eventos
+    AuditLog --> AuditOutcome : clasifica
+
+    AuthController ..> AuditLogger : getInstance()
+    DeviceReadingFactory ..> AuditLogger : getInstance()
+    ClinicalRecordExporter ..> AuditLogger : getInstance()
+    ClinicalEncounterController ..> AuditLogger : getInstance()
+```
+
+`instance`, `getInstance()` y `resetInstance()` son **estáticos**. Las tres
+puertas de entrada están cerradas a propósito: `__construct()` y `__clone()` son
+privados y `__wakeup()` lanza excepción, de modo que no hay forma de obtener una
+segunda instancia ni por `new`, ni por `clone`, ni deserializando.
+
+Nótese que ningún cliente recibe el logger por inyección: todos lo piden con
+`getInstance()`, que es justo lo que garantiza que `requestId` y `sequence` sean
+los mismos para toda la petición.
+
+## El núcleo del patrón
 
 Extracto de `backend/app/Support/Audit/AuditLogger.php`:
 

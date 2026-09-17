@@ -23,6 +23,119 @@ continuidad asistencial.
 | Configuración | `backend/config/interop.php` |
 | Pruebas del patrón | `backend/tests/Unit/ClinicalExchangeFactoryTest.php`, `backend/tests/Feature/ClinicalExportTest.php` |
 
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class ClinicalExchangeFactory {
+        <<interface>>
+        +standard() ExchangeStandard
+        +createPatientSerializer() PatientSerializer
+        +createObservationSerializer() ObservationSerializer
+        +createEnvelope() ExchangeEnvelope
+    }
+
+    class FhirR4ExchangeFactory
+    class RdaExchangeFactory
+    class AnonymizedExchangeFactory
+
+    class PatientSerializer {
+        <<interface>>
+        +serialize(patient) array
+        +reference(patient) string
+    }
+    class ObservationSerializer {
+        <<interface>>
+        +serialize(reading, patientReference) array
+    }
+    class ExchangeEnvelope {
+        <<interface>>
+        +assemble(patient, observations, generatedAt) array
+        +mediaType() string
+        +filename(generatedAt) string
+    }
+
+    class FhirPatientSerializer
+    class FhirObservationSerializer
+    class FhirBundleEnvelope
+
+    class RdaPatientSerializer
+    class RdaObservationSerializer
+    class RdaDocumentEnvelope
+
+    class AnonymizedPatientSerializer
+    class AnonymizedObservationSerializer
+    class AnonymizedDatasetEnvelope
+
+    class ExchangeStandard {
+        <<enumeration>>
+        FhirR4
+        Rda
+        Anonymized
+        +label() string
+        +legalBasis() string
+        +identifiesPatient() bool
+    }
+
+    class ClinicalExchangeFactoryResolver {
+        +for(standard) ClinicalExchangeFactory
+        +supportedStandards() array
+        +catalog() array
+    }
+
+    class ClinicalRecordExporter {
+        <<cliente>>
+        -factory ClinicalExchangeFactory
+        +export(patient, request, limit) array
+    }
+
+    ClinicalExchangeFactory <|.. FhirR4ExchangeFactory
+    ClinicalExchangeFactory <|.. RdaExchangeFactory
+    ClinicalExchangeFactory <|.. AnonymizedExchangeFactory
+
+    PatientSerializer <|.. FhirPatientSerializer
+    PatientSerializer <|.. RdaPatientSerializer
+    PatientSerializer <|.. AnonymizedPatientSerializer
+
+    ObservationSerializer <|.. FhirObservationSerializer
+    ObservationSerializer <|.. RdaObservationSerializer
+    ObservationSerializer <|.. AnonymizedObservationSerializer
+
+    ExchangeEnvelope <|.. FhirBundleEnvelope
+    ExchangeEnvelope <|.. RdaDocumentEnvelope
+    ExchangeEnvelope <|.. AnonymizedDatasetEnvelope
+
+    FhirR4ExchangeFactory ..> FhirPatientSerializer : crea
+    FhirR4ExchangeFactory ..> FhirObservationSerializer : crea
+    FhirR4ExchangeFactory ..> FhirBundleEnvelope : crea
+
+    RdaExchangeFactory ..> RdaPatientSerializer : crea
+    RdaExchangeFactory ..> RdaObservationSerializer : crea
+    RdaExchangeFactory ..> RdaDocumentEnvelope : crea
+
+    AnonymizedExchangeFactory ..> AnonymizedPatientSerializer : crea
+    AnonymizedExchangeFactory ..> AnonymizedObservationSerializer : crea
+    AnonymizedExchangeFactory ..> AnonymizedDatasetEnvelope : crea
+
+    ClinicalExchangeFactory ..> ExchangeStandard : identifica familia
+    ClinicalExchangeFactoryResolver ..> ClinicalExchangeFactory : elige en runtime
+    ClinicalRecordExporter --> ClinicalExchangeFactory : usa
+    ClinicalRecordExporter ..> PatientSerializer : usa
+    ClinicalRecordExporter ..> ObservationSerializer : usa
+    ClinicalRecordExporter ..> ExchangeEnvelope : usa
+```
+
+Se ven las **tres columnas de productos** —paciente, observaciones y sobre— y las
+**tres filas de familias** —FHIR, RDA y anonimizada—. Cada fábrica concreta crea
+exactamente una pieza de cada columna, y ésa es la garantía del patrón: al pedir
+los tres productos a la misma fábrica, las piezas de dos familias distintas no
+pueden mezclarse.
+
+`ClinicalRecordExporter` sólo conoce las cuatro interfaces de la izquierda: no
+nombra ni una sola clase concreta.
+
 ## El núcleo del patrón
 
 La fábrica abstracta declara un método de creación **por cada producto de la
