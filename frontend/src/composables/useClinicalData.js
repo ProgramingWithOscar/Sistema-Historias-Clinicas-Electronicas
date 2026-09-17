@@ -10,6 +10,7 @@ const standards = ref([])
 const exportacion = ref(null)
 const encounters = ref([])
 const encounterTypes = ref([])
+const templates = ref([])
 const error = ref(null)
 
 async function cargar(recurso, destino) {
@@ -31,6 +32,7 @@ export function useClinicalData() {
     exportacion,
     encounters,
     encounterTypes,
+    templates,
     error,
 
     criticas: computed(() => readings.value.filter((r) => r.severity === 'critical').length),
@@ -42,6 +44,26 @@ export function useClinicalData() {
     cargarEstandares: () => cargar('/exchange-standards', standards),
     cargarAtenciones: () => cargar('/clinical-encounters', encounters),
     cargarTiposAtencion: () => cargar('/encounter-types', encounterTypes),
+    cargarPlantillas: () => cargar('/encounter-templates', templates),
+
+    /**
+     * Pide el borrador de una plantilla. Cada llamada devuelve una copia
+     * independiente: el catálogo del servidor nunca se modifica.
+     */
+    async cargarBorrador(key) {
+      const { data } = await api(`/encounter-templates/${key}/draft`)
+      return data.payload
+    },
+
+    /** Guarda una nota ya registrada como plantilla reutilizable. */
+    async guardarPlantilla({ encounterId, key, name }) {
+      const { data } = await api('/encounter-templates', {
+        method: 'POST',
+        body: { encounter_id: encounterId, key, name },
+      })
+      templates.value = [...templates.value, data]
+      return data
+    },
 
     async cargarTodo() {
       await Promise.all([

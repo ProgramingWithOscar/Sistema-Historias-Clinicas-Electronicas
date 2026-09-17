@@ -5,8 +5,18 @@ import { useClinicalData } from '../../composables/useClinicalData'
 import { useRefresh } from '../../composables/useRefresh'
 import { fecha } from '../../utils/format'
 
-const { encounters, encounterTypes, error, cargarAtenciones, cargarTiposAtencion, registrarAtencion } =
-  useClinicalData()
+const {
+  encounters,
+  encounterTypes,
+  templates,
+  error,
+  cargarAtenciones,
+  cargarTiposAtencion,
+  cargarPlantillas,
+  cargarBorrador,
+  guardarPlantilla,
+  registrarAtencion,
+} = useClinicalData()
 const { register } = useRefresh()
 
 /**
@@ -40,6 +50,14 @@ const fieldErrors = ref({})
 const aviso = ref(null)
 const abierta = ref(null)
 
+// Plantillas (patrón Prototype)
+const plantilla = ref('')
+const guardando = ref(null)
+
+const plantillasDelTipo = computed(() =>
+  templates.value.filter((t) => t.encounter_type === encounterType.value),
+)
+
 const campos = computed(() => especificos[encounterType.value] ?? [])
 const tipo = computed(() => encounterTypes.value.find((t) => t.encounter_type === encounterType.value))
 
@@ -48,6 +66,70 @@ function cambiarTipo() {
   diagnosticos.value = [{ code: '', description: '' }]
   fieldErrors.value = {}
   aviso.value = null
+  plantilla.value = ''
+}
+
+/**
+ * Carga una plantilla en el formulario.
+ *
+ * El backend devuelve una COPIA del prototipo, así que lo que se edite aquí no
+ * afecta al catálogo ni a lo que cargue otro profesional al mismo tiempo.
+ */
+async function aplicarPlantilla() {
+  if (!plantilla.value) return
+
+  fieldErrors.value = {}
+  aviso.value = null
+
+  try {
+    const borrador = await cargarBorrador(plantilla.value)
+
+    valores.chief_complaint = borrador.chief_complaint ?? ''
+    valores.treatment_plan = borrador.treatment_plan ?? ''
+    if (borrador.follow_up_at) valores.follow_up_at = borrador.follow_up_at
+    if (borrador.program) valores.program = borrador.program
+
+    diagnosticos.value = (borrador.diagnoses ?? []).map((d) => ({
+      code: d.code,
+      description: d.description,
+    }))
+
+    aviso.value = {
+      tono: 'success',
+      texto: 'Plantilla cargada. Ajusta lo que sea propio de este paciente antes de registrar.',
+    }
+  } catch (e) {
+    aviso.value = { tono: 'failure', texto: e.message }
+  }
+}
+
+/** Convierte una nota ya registrada en una plantilla reutilizable. */
+async function guardarComoPlantilla(encuentro) {
+  const nombre = window.prompt('Nombre de la plantilla:', encuentro.chief_complaint)
+  if (!nombre) return
+
+  const clave = nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60)
+
+  guardando.value = encuentro.id
+  aviso.value = null
+
+  try {
+    await guardarPlantilla({ encounterId: encuentro.id, key: clave, name: nombre })
+    aviso.value = {
+      tono: 'success',
+      texto: `Plantilla «${nombre}» guardada sin los datos del paciente.`,
+    }
+  } catch (e) {
+    aviso.value = { tono: 'failure', texto: e.errors?.key?.[0] ?? e.message }
+  } finally {
+    guardando.value = null
+  }
 }
 
 function agregarDiagnostico() {
@@ -65,6 +147,9 @@ async function enviar() {
 
   const payload = {
     encounter_type: encounterType.value,
+    // Si la nota partió de una plantilla, se declara: el backend rellena con la
+    // copia del prototipo los huecos que el formulario no haya cubierto.
+    ...(plantilla.value ? { template: plantilla.value } : {}),
     professional_license: valores.professional_license,
     chief_complaint: valores.chief_complaint,
     present_illness: valores.present_illness,
@@ -99,6 +184,7 @@ register(cargarAtenciones)
 
 onMounted(() => {
   cargarTiposAtencion()
+  cargarPlantillas()
   cargarAtenciones()
 })
 </script>
@@ -132,6 +218,20 @@ onMounted(() => {
             <em v-for="s in t.required_sections" :key="s">{{ s }}</em>
           </span>
         </button>
+      </div>
+
+      <div v-if="plantillasDelTipo.length" class="plantillas">
+        <label for="plantilla">Partir de una plantilla</label>
+        <select id="plantilla" v-model="plantilla" @change="aplicarPlantilla">
+          <option value="">Sin plantilla — empezar en blanco</option>
+          <option v-for="p in plantillasDelTipo" :key="p.key" :value="p.key">
+            {{ p.name }}{{ p.built_in ? '' : ' (propia)' }}
+          </option>
+        </select>
+        <p class="nota aparte">
+          Cada carga es una copia independiente del prototipo: lo que ajustes aquí no altera la
+          plantilla del catálogo ni la de otro profesional.
+        </p>
       </div>
 
       <form class="formulario" @submit.prevent="enviar">
@@ -259,13 +359,22 @@ onMounted(() => {
                 <td><code>{{ e.diagnoses[0]?.code }}</code> {{ e.diagnoses[0]?.description }}</td>
                 <td>{{ e.triage ?? '—' }}</td>
                 <td>{{ fecha(e.attended_at) }}</td>
-                <td>
+                <td class="acciones-fila">
                   <button
                     type="button"
                     class="btn ghost pequeno"
                     @click="abierta = abierta === e.id ? null : e.id"
                   >
                     {{ abierta === e.id ? 'Cerrar' : 'Ver nota' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn ghost pequeno"
+                    :disabled="guardando === e.id"
+                    title="Clona la estructura de esta nota sin los datos del paciente"
+                    @click="guardarComoPlantilla(e)"
+                  >
+                    {{ guardando === e.id ? 'Guardando...' : 'Guardar plantilla' }}
                   </button>
                 </td>
               </tr>
@@ -382,6 +491,30 @@ onMounted(() => {
   border-radius: 20px;
   color: var(--accent);
   background: var(--accent-bg);
+}
+
+.plantillas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.plantillas > label {
+  font-size: 13px;
+}
+
+.plantillas select {
+  max-width: 420px;
+}
+
+.acciones-fila {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .formulario {

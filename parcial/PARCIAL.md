@@ -912,4 +912,3 @@ patrones creacionales anteriores resuelve eso:
   desde la interfaz, algo imposible si cada plantilla fuera una clase.
 
 
-

@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Support\Encounters\EncounterDirectorResolver;
+use App\Support\Templates\TemplateLibrary;
+use App\Support\Templates\TemplateRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,12 +22,42 @@ class StoreClinicalEncounterRequest extends FormRequest
         return true;
     }
 
+    private ?TemplateRegistry $registry = null;
+
+    /**
+     * Si la petición trae una plantilla, se copia el prototipo y sus valores
+     * rellenan los huecos ANTES de validar.
+     *
+     * Lo que envía el profesional siempre gana: la plantilla es un punto de
+     * partida, nunca una imposición. Y el resto del flujo no se entera de que
+     * existen plantillas —director, builder y producto siguen igual—.
+     */
+    protected function prepareForValidation(): void
+    {
+        $key = $this->input('template');
+
+        if (! is_string($key) || ! $this->registry()->has($key)) {
+            return;   // una clave desconocida la reporta la regla de abajo
+        }
+
+        // `get()` devuelve una copia: el catálogo original no se toca.
+        $this->merge([...$this->registry()->get($key)->toPayload(), ...$this->all()]);
+    }
+
+    /** Se memoriza para no recomponer el catálogo dos veces por petición. */
+    private function registry(): TemplateRegistry
+    {
+        return $this->registry ??= (new TemplateLibrary)->registry();
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         $comunes = [
+            // Opcional: sin plantilla, el flujo es exactamente el de siempre.
+            'template' => ['sometimes', 'nullable', 'string', Rule::in($this->registry()->keys())],
             'encounter_type' => ['required', 'string', Rule::in(EncounterDirectorResolver::supportedTypes())],
             'patient_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'professional_license' => ['required', 'string', 'max:40'],
@@ -65,6 +97,7 @@ class StoreClinicalEncounterRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'template.in' => 'La plantilla indicada no existe.',
             'encounter_type.required' => 'Debe indicarse el tipo de atención.',
             'encounter_type.in' => 'El tipo de atención indicado no está soportado.',
             'diagnoses.required' => 'La nota debe incluir al menos un diagnóstico.',

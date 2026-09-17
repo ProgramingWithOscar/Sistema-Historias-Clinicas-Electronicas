@@ -22,6 +22,8 @@ export const acciones = {
   'iot.reading.ingested': 'Lectura IoT recibida',
   'hce.export.generated': 'Exportación de la HCE',
   'hce.encounter.created': 'Nota de atención registrada',
+  'hce.template.applied': 'Plantilla aplicada',
+  'hce.template.saved': 'Plantilla guardada',
 }
 
 /** Tipos de atención que atiende el resolver de directores del backend. */

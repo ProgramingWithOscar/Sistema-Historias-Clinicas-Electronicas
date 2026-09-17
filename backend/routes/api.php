@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClinicalEncounterController;
 use App\Http\Controllers\Api\ClinicalExportController;
+use App\Http\Controllers\Api\ClinicalTemplateController;
 use App\Http\Controllers\Api\DeviceReadingController;
 use App\Http\Controllers\Api\PingController;
 use App\Http\Controllers\Api\SessionController;
@@ -36,6 +37,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/encounter-types', [ClinicalEncounterController::class, 'types']);
     Route::get('/clinical-encounters', [ClinicalEncounterController::class, 'index']);
     Route::post('/clinical-encounters', [ClinicalEncounterController::class, 'store']);
+
+    // Plantillas de atención: el patrón Prototype entrega una copia profunda de
+    // una nota ya configurada, en lugar de rehacerla paso a paso.
+    Route::get('/encounter-templates', [ClinicalTemplateController::class, 'index']);
+    Route::get('/encounter-templates/{key}/draft', [ClinicalTemplateController::class, 'draft']);
+    Route::post('/encounter-templates', [ClinicalTemplateController::class, 'store']);
 
     Route::get('/user', function (Request $request) {
         return $request->user();
