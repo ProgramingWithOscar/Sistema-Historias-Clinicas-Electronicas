@@ -1589,30 +1589,3 @@ classDiagram
     AuthController ..> AuditLogger : auth.login.succeeded
     AuditLogger --> AuditLog : persiste el evento
 ```
-
-## Recorrido completo de un dato
-
-El camino de una cifra desde el dispositivo hasta otro prestador atraviesa los
-cinco patrones en orden:
-
-| Paso | Patrón | Qué ocurre |
-|---|---|---|
-| 1 | **Prototype** | El médico carga una copia de la plantilla del motivo de consulta |
-| 2 | **Factory Method** | El tensiómetro envía su lectura y se normaliza a LOINC + UCUM + severidad |
-| 3 | **Builder** | El director arma la nota, incorpora esa lectura y `build()` valida el contenido mínimo |
-| 4 | **Abstract Factory** | La historia se exporta en FHIR, RDA o anonimizada, con la familia coherente |
-| 5 | **Singleton** | Cada uno de los pasos anteriores queda trazado en `audit_logs` |
-
-## Estado del código
-
-| Módulo | Patrón | Pruebas |
-|---|---|---|
-| `Support/Audit` | Singleton | `AuditLoggerSingletonTest`, `AuthAuditTest` |
-| `Support/Iot` | Factory Method | `DeviceReadingFactoryTest`, `DeviceReadingIngestionTest` |
-| `Support/Interop` | Abstract Factory | `ClinicalExchangeFactoryTest`, `ClinicalExportTest` |
-| `Support/Encounters` | Builder | `ClinicalNoteBuilderTest`, `ClinicalEncounterTest` |
-| `Support/Templates` | Prototype | `EncounterTemplatePrototypeTest`, `ClinicalTemplateTest` |
-
-```bash
-cd backend && php artisan test     # 110 pruebas, 403 aserciones
-```
