@@ -1417,3 +1417,202 @@ patrones creacionales anteriores resuelve eso:
 
 
 
+
+# UML global del proyecto
+
+## Arquitectura por capas y módulos
+
+```mermaid
+flowchart TB
+    subgraph FE["Frontend · Vue 3 + Vite"]
+        direction TB
+        Shell["AppShell<br/>navegación por secciones"]
+        Vistas["OverviewView · DeviceReadingsView · EncountersView<br/>InteroperabilityView · SessionsView · AuditView"]
+        ApiJs["services/api.js<br/>Sanctum (cookie de sesión + CSRF)"]
+        Shell --> Vistas --> ApiJs
+    end
+
+    subgraph API["API REST · Laravel 12 (routes/api.php)"]
+        direction TB
+        AuthC["AuthController<br/>SessionController"]
+        DevC["DeviceReadingController"]
+        EncC["ClinicalEncounterController"]
+        TplC["ClinicalTemplateController"]
+        ExpC["ClinicalExportController"]
+        AudC["AuditLogController"]
+    end
+
+    subgraph DOM["Dominio · backend/app/Support"]
+        direction TB
+        S1["Audit/ — SINGLETON<br/>AuditLogger"]
+        S2["Iot/ — FACTORY METHOD<br/>DeviceReadingFactory + ClinicalReading"]
+        S3["Encounters/ — BUILDER<br/>ClinicalNoteBuilder + Directores"]
+        S4["Templates/ — PROTOTYPE<br/>EncounterTemplate + TemplateRegistry"]
+        S5["Interop/ — ABSTRACT FACTORY<br/>ClinicalExchangeFactory + 3 familias"]
+    end
+
+    subgraph DB["Persistencia · MySQL 8.4"]
+        direction LR
+        T1[(users)]
+        T2[(audit_logs)]
+        T3[(device_readings)]
+        T4[(clinical_encounters)]
+        T5[(clinical_templates)]
+    end
+
+    ApiJs -->|HTTP JSON| API
+
+    AuthC --> S1
+    AudC --> S1
+    DevC --> S2
+    EncC --> S3
+    TplC --> S4
+    ExpC --> S5
+
+    S2 -.audita.-> S1
+    S3 -.signos vitales.-> S2
+    S4 -.rellena el payload.-> S3
+    S5 -.observaciones.-> S2
+
+    S1 --> T2
+    S2 --> T3
+    S3 --> T4
+    S4 --> T5
+    S1 --> T1
+```
+
+Las flechas punteadas entre módulos son las que importan: **ningún patrón vive
+aislado**. El Builder toma del Factory Method los signos vitales ya
+normalizados, el Prototype alimenta al Builder con una copia de la plantilla, el
+Abstract Factory exporta esas mismas lecturas, y los cuatro escriben en el
+Singleton de auditoría.
+
+## Cómo se encadenan los cinco patrones
+
+```mermaid
+classDiagram
+    direction LR
+
+    class AuditLogger {
+        <<Singleton>>
+        +getInstance() AuditLogger
+        +record(action, actorId, subjectType, subjectId, metadata) AuditLog
+    }
+
+    class DeviceReadingFactory {
+        <<Factory Method>>
+        +ingest(payload, patientId, request) DeviceReading
+        #makeReading(payload) ClinicalReading
+    }
+
+    class EncounterDirector {
+        <<Director>>
+        +construct(payload, patient, professional) ClinicalNote
+    }
+
+    class ClinicalNoteBuilder {
+        <<Builder>>
+        +withDeviceReadings(readings) self
+        +build() ClinicalNote
+    }
+
+    class EncounterTemplate {
+        <<Prototype>>
+        +copy() EncounterTemplate
+        +fromEncounter(encounter, key, name) EncounterTemplate
+        +toPayload() array
+    }
+
+    class ClinicalExchangeFactory {
+        <<Abstract Factory>>
+        +createPatientSerializer() PatientSerializer
+        +createObservationSerializer() ObservationSerializer
+        +createEnvelope() ExchangeEnvelope
+    }
+
+    class ClinicalRecordExporter {
+        +export(patient, request, limit) array
+    }
+
+    class User {
+        <<Eloquent>>
+    }
+    class DeviceReading {
+        <<Eloquent>>
+    }
+    class ClinicalEncounter {
+        <<Eloquent>>
+    }
+    class ClinicalTemplate {
+        <<Eloquent>>
+    }
+    class AuditLog {
+        <<Eloquent>>
+    }
+
+    class DeviceReadingController {
+        <<API>>
+    }
+    class ClinicalEncounterController {
+        <<API>>
+    }
+    class ClinicalTemplateController {
+        <<API>>
+    }
+    class ClinicalExportController {
+        <<API>>
+    }
+    class AuthController {
+        <<API>>
+    }
+
+    DeviceReadingController ..> DeviceReadingFactory
+    ClinicalEncounterController ..> EncounterDirector
+    ClinicalTemplateController ..> EncounterTemplate
+    ClinicalExportController ..> ClinicalRecordExporter
+
+    DeviceReadingFactory --> DeviceReading : normaliza y persiste
+    EncounterDirector --> ClinicalNoteBuilder : dirige los pasos
+    ClinicalNoteBuilder ..> DeviceReading : incorpora signos vitales
+    ClinicalNoteBuilder --> ClinicalEncounter : nota validada
+    EncounterTemplate ..> ClinicalEncounter : fromEncounter() despersonaliza
+    EncounterTemplate --> ClinicalTemplate : se guarda el prototipo
+    EncounterTemplate ..> EncounterDirector : toPayload() rellena huecos
+    ClinicalRecordExporter --> ClinicalExchangeFactory : familia del estandar
+    ClinicalRecordExporter ..> DeviceReading : observaciones
+    ClinicalRecordExporter ..> User : paciente
+
+    DeviceReadingFactory ..> AuditLogger : iot.reading.ingested
+    ClinicalEncounterController ..> AuditLogger : hce.encounter.created
+    ClinicalTemplateController ..> AuditLogger : hce.template.saved
+    ClinicalRecordExporter ..> AuditLogger : hce.export.generated
+    AuthController ..> AuditLogger : auth.login.succeeded
+    AuditLogger --> AuditLog : persiste el evento
+```
+
+## Recorrido completo de un dato
+
+El camino de una cifra desde el dispositivo hasta otro prestador atraviesa los
+cinco patrones en orden:
+
+| Paso | Patrón | Qué ocurre |
+|---|---|---|
+| 1 | **Prototype** | El médico carga una copia de la plantilla del motivo de consulta |
+| 2 | **Factory Method** | El tensiómetro envía su lectura y se normaliza a LOINC + UCUM + severidad |
+| 3 | **Builder** | El director arma la nota, incorpora esa lectura y `build()` valida el contenido mínimo |
+| 4 | **Abstract Factory** | La historia se exporta en FHIR, RDA o anonimizada, con la familia coherente |
+| 5 | **Singleton** | Cada uno de los pasos anteriores queda trazado en `audit_logs` |
+
+## Estado del código
+
+| Módulo | Patrón | Pruebas |
+|---|---|---|
+| `Support/Audit` | Singleton | `AuditLoggerSingletonTest`, `AuthAuditTest` |
+| `Support/Iot` | Factory Method | `DeviceReadingFactoryTest`, `DeviceReadingIngestionTest` |
+| `Support/Interop` | Abstract Factory | `ClinicalExchangeFactoryTest`, `ClinicalExportTest` |
+| `Support/Encounters` | Builder | `ClinicalNoteBuilderTest`, `ClinicalEncounterTest` |
+| `Support/Templates` | Prototype | `EncounterTemplatePrototypeTest`, `ClinicalTemplateTest` |
+
+```bash
+cd backend && php artisan test     # 110 pruebas, 403 aserciones
+```
