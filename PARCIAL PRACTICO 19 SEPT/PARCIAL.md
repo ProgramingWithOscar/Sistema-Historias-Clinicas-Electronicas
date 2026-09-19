@@ -1,3 +1,39 @@
+<div align="center">
+
+# Sistema de Historias Clínicas Electrónicas
+
+### Informe Técnico — Parcial Práctico
+
+**Patrones de Diseño Creacionales**
+
+Singleton · Factory Method · Abstract Factory · Builder · Prototype
+
+---
+
+**Integrantes**
+
+Oscar Eduardo Poveda Lozada
+
+Pedro Alejandro Toloza Ahogado
+
+---
+
+**Asignatura**
+
+Patrones de Diseño de Software
+
+**Institución**
+
+UTS — Institución Universitaria Tecnológica de Santander
+
+19 de septiembre de 2026
+
+</div>
+
+<div style="page-break-after: always;"></div>
+
+---
+
 # Sistema Historias Clínicas Electronicas 🫆
 Proyecto para la gestión de pacientes, citas, diagnósticos y tratamientos.
 Integración con dispositivos IoT
@@ -218,6 +254,40 @@ instancia en toda la petición:
 
 - `requestId`: identificador que agrupa todos los eventos de una misma atención.
 - `sequence`: contador que da el orden cronológico de esos eventos.
+## Pruebas del patrón Singleton
+
+```bash
+cd backend
+php artisan test --filter="AuditLoggerSingletonTest|AuthAuditTest"
+```
+
+**`tests/Unit/AuditLoggerSingletonTest.php`** — la mecánica del patrón
+
+| Prueba | Qué garantiza |
+|---|---|
+| Devuelve siempre la misma instancia | `getInstance()` nunca crea una segunda instancia |
+| El constructor es privado | No se puede esquivar el patrón con `new AuditLogger()` |
+| No puede clonarse | `clone` está bloqueado: sería la segunda vía de duplicación |
+| No puede deserializarse | `__wakeup()` lanza excepción: la tercera vía, también cerrada |
+| El contenedor resuelve la misma instancia que `getInstance` | Ni siquiera la inyección de dependencias de Laravel rompe la unicidad |
+| Comparte `requestId` y secuencia entre llamadas desacopladas | Dos módulos que no se conocen escriben en el mismo correlativo |
+
+**`tests/Feature/AuthAuditTest.php`** — el patrón en uso real
+
+| Prueba | Qué garantiza |
+|---|---|
+| Un login exitoso queda auditado | El evento llega a `audit_logs` con su actor |
+| Un login fallido queda auditado sin la contraseña | Se traza el intento sin filtrar credenciales |
+| El logout cierra la sesión y queda auditado | El cierre también deja rastro |
+
+**Resultado**
+
+```
+Tests:    9 passed (28 assertions)
+```
+
+---
+
 ## Patrón de Diseño: Factory Method
 
 ### ¿Por qué Factory Method en este proyecto?
@@ -478,6 +548,46 @@ resolver: el controlador, la ruta, el modelo y la migración no se tocan
 Además, `ingest()` se declara `final` a propósito: si una subclase pudiera
 reescribir el flujo, podría saltarse el registro de auditoría que exige la
 trazabilidad de la HCEI (Ley 2015 de 2020).
+
+## Pruebas del patrón Factory Method
+
+```bash
+cd backend
+php artisan test --filter="DeviceReadingFactoryTest|DeviceReadingIngestionTest"
+```
+
+**`tests/Unit/DeviceReadingFactoryTest.php`** — la mecánica del patrón
+
+| Prueba | Qué garantiza |
+|---|---|
+| El creador es abstracto y el método fábrica también | La superclase no puede instanciarse ni decidir el producto |
+| El flujo de ingesta es `final` y no puede sobreescribirse | Ninguna subclase puede saltarse la auditoría obligatoria |
+| Cada creador concreto devuelve su propio producto | `GlucometerFactory` → `GlucoseReading`, y así las tres |
+| Todos los productos cumplen el mismo contrato | El creador puede tratarlos sin saber cuál es |
+| El resolver entrega el creador que corresponde | La elección en runtime funciona |
+| El resolver rechaza un dispositivo desconocido | Un equipo no soportado falla con error de validación |
+| La glucemia interpreta el ayuno en sus umbrales | 150 mg/dL es normal tras comer y elevado en ayunas: la regla vive en el producto |
+| Cada producto clasifica su criticidad (8 casos) | Normal, hipoglucemia severa, hiperglucemia, hipertensión, crisis, hipoxemia… |
+
+**`tests/Feature/DeviceReadingIngestionTest.php`** — el patrón en uso real
+
+| Prueba | Qué garantiza |
+|---|---|
+| Ingesta de glucómetro, tensiómetro y oxímetro | Los tres dispositivos entran por la misma ruta |
+| Cada dispositivo produce una lectura distinta por la misma ruta | Un solo endpoint, tres productos distintos |
+| Rechaza un dispositivo no soportado | Error 422 controlado |
+| Cada fábrica valida el payload de su propio dispositivo | Las reglas no se mezclan entre equipos |
+| Toda ingesta queda auditada por el Singleton | Los dos patrones trabajan juntos |
+| Lista las lecturas y los dispositivos soportados | El catálogo sale del resolver |
+| La ingesta exige autenticación | Sin sesión no se escribe en la historia |
+
+**Resultado**
+
+```
+Tests:    24 passed (74 assertions)
+```
+
+---
 
 ## Semana 5 - Patrón de Diseño: Abstract Factory
 
@@ -776,6 +886,47 @@ mal las piezas. Con él, añadir un formato nuevo (CDA, HL7 v2, PDF firmado) es
 escribir una fábrica con sus tres productos y registrar una línea en
 `ClinicalExchangeFactoryResolver`: el exportador, el controlador y la ruta no se
 tocan (principio abierto/cerrado).
+
+## Pruebas del patrón Abstract Factory
+
+```bash
+cd backend
+php artisan test --filter="ClinicalExchangeFactoryTest|ClinicalExportTest"
+```
+
+**`tests/Unit/ClinicalExchangeFactoryTest.php`** — la mecánica del patrón
+
+| Prueba | Qué garantiza |
+|---|---|
+| Cada fábrica concreta entrega la familia completa de su estándar | Las tres fábricas devuelven sus tres productos propios |
+| Todas las familias cumplen los mismos contratos abstractos (3 casos) | El cliente puede usarlas sin conocerlas |
+| Ninguna familia comparte productos con otra | Si dos familias compartieran un objeto, mezclarlas sería posible |
+| El resolver entrega la fábrica del estándar pedido | La elección en runtime funciona |
+| El resolver rechaza un estándar desconocido | Un formato no soportado falla controladamente |
+| Cada sobre declara su propio media type | El `Bundle` de FHIR no se publica como JSON genérico |
+
+**`tests/Feature/ClinicalExportTest.php`** — el patrón en uso real
+
+| Prueba | Qué garantiza |
+|---|---|
+| Exporta la historia como `Bundle` de FHIR | Documento válido con LOINC, UCUM e interpretación HL7 |
+| La observación de FHIR apunta al paciente de su misma familia | **Consistencia de familia**: la referencia la produce el serializador hermano |
+| Exporta la historia como Resumen Digital de Atención | El RDA no usa recursos FHIR en ningún nivel |
+| La exportación anonimizada no publica ningún dato identificable | Se verifica sobre el **JSON completo**, no sólo sobre el bloque del sujeto |
+| El seudónimo es estable entre exportaciones | Permite estudios longitudinales sin ser reversible |
+| El mismo paciente produce documentos distintos según la familia | Misma entrada, estructuras incompatibles entre sí |
+| Rechaza un estándar no soportado | Error 422 controlado |
+| Cada exportación queda auditada | Toda salida de información clínica se traza |
+| Lista las familias disponibles | El catálogo sale del resolver |
+| La exportación requiere sesión | Sin autenticación no se extrae la historia |
+
+**Resultado**
+
+```
+Tests:    18 passed (76 assertions)
+```
+
+---
 
 ## Patrón de Diseño: Builder
 
@@ -1120,6 +1271,55 @@ controlador y la migración no se tocan. Y `construct()` es `final` a propósito
 si una subclase pudiera reescribir la secuencia, podría omitir los diagnósticos o
 el encabezado y saltarse el contenido mínimo legal.
 
+## Pruebas del patrón Builder
+
+```bash
+cd backend
+php artisan test --filter="ClinicalNoteBuilderTest|ClinicalEncounterTest"
+```
+
+**`tests/Unit/ClinicalNoteBuilderTest.php`** — la mecánica del patrón
+
+| Prueba | Qué garantiza |
+|---|---|
+| El producto sólo puede crearse desde el builder | El constructor de `ClinicalNote` es privado |
+| El producto es inmutable | Todas las propiedades son `readonly` y no hay un solo *setter* |
+| Cada paso devuelve el mismo builder | La interfaz fluida permite al director encadenar |
+| Una nota sin contenido mínimo no llega a existir | `build()` aborta e informa de **todo** lo que falta |
+| La urgencia exige triaje y signos vitales | Res. 5596 de 2015 |
+| El control ambulatorio exige antecedentes | Sin ellos no hay seguimiento que auditar |
+| La teleconsulta exige consentimiento | Res. 2654 de 2019 |
+| No puede documentarse un examen físico en una teleconsulta | Consignar una exploración que no ocurrió falsea la historia |
+| La nota completa se construye y conserva sus partes | El camino feliz entrega el producto íntegro |
+| El diagnóstico principal es el marcado y no el primero | La regla vive en el producto |
+| El director es abstracto y su secuencia es `final` | Ninguna subclase puede omitir un paso del esqueleto |
+| El resolver entrega el director que corresponde | La elección en runtime funciona |
+| El resolver rechaza un tipo de atención desconocido | Error de validación controlado |
+
+**`tests/Feature/ClinicalEncounterTest.php`** — el patrón en uso real
+
+| Prueba | Qué garantiza |
+|---|---|
+| Registra urgencias, control ambulatorio y teleconsulta | Los tres directores producen notas válidas |
+| El control sin antecedentes se rechaza | El guardián actúa vía API |
+| La teleconsulta rechaza el examen físico | No se ignora en silencio: quien lo envía se entera |
+| La teleconsulta sin consentimiento se rechaza | Requisito legal verificado |
+| Una nota sin diagnóstico se rechaza | Contenido mínimo Res. 1995 de 1999 |
+| El diagnóstico debe usar un código CIE-10 válido | Vocabulario controlado |
+| **Una urgencia sin signos vitales no llega a persistirse** | `build()` aborta **antes** de tocar la base de datos |
+| El director no revienta ante un payload incompleto | Deja hablar a `build()` en lugar de morir en el primer hueco |
+| Cada nota queda auditada | Integración con el Singleton |
+| Sin `patient_id` la nota se atribuye al usuario autenticado | Comportamiento por defecto coherente con el resto |
+| Lista los tipos de atención y las notas registradas | El catálogo sale del resolver |
+
+**Resultado**
+
+```
+Tests:    28 passed (111 assertions)
+```
+
+---
+
 ## Patrón de Diseño: Prototype
 
 ### ¿Por qué Prototype en este proyecto?
@@ -1417,6 +1617,94 @@ patrones creacionales anteriores resuelve eso:
 
 
 
+
+## Pruebas del patrón Prototype
+
+```bash
+cd backend
+php artisan test --filter="EncounterTemplatePrototypeTest|ClinicalTemplateTest"
+```
+
+**`tests/Unit/EncounterTemplatePrototypeTest.php`** — la mecánica del patrón
+
+| Prueba | Qué garantiza |
+|---|---|
+| La plantilla es un prototipo | Implementa `ClinicalPrototype` |
+| La copia es un objeto distinto con el mismo contenido | `copy()` duplica, no devuelve la misma referencia |
+| **Ajustar la dosis de la copia no toca la plantilla original** | La prueba de fuego: sin `__clone()` profundo, ajustar una dosis cambiaría la dosis del siguiente paciente |
+| Cambiar el diagnóstico de la copia no toca el original | Lo mismo para los diagnósticos |
+| Las partes de la copia son objetos independientes | Mismo contenido, distinta identidad: copia profunda real |
+| Añadir un diagnóstico a la copia no alarga el original | Los arreglos también se copian, no se comparten |
+| El registro nunca entrega el prototipo original | Dos médicos cargando la misma plantilla no se pisan |
+| El registro trae las plantillas institucionales | Las cuatro del catálogo están disponibles |
+| El registro rechaza una plantilla inexistente | Error de validación controlado |
+| Se puede registrar una plantilla nueva sin escribir una clase | Lo que evita una subclase por motivo de consulta |
+| El borrador sale listo para el endpoint de atenciones | El intervalo de control se resuelve a fecha al copiar |
+
+**`tests/Feature/ClinicalTemplateTest.php`** — el patrón en uso real
+
+| Prueba | Qué garantiza |
+|---|---|
+| Lista el catálogo de plantillas institucionales | Cuatro plantillas disponibles vía API |
+| El borrador llega listo para registrar la atención | Diagnóstico, plan y medicación pre-cargados |
+| **El borrador nunca trae datos de ningún paciente** | Una plantilla es estructura, no la historia de nadie |
+| Pedir el borrador dos veces da copias independientes | La copia se verifica también de extremo a extremo |
+| La plantilla rellena los huecos de la nota | Integración Prototype → Builder |
+| Lo que envía el profesional gana sobre la plantilla | La plantilla propone, no impone |
+| **Ajustar la dosis en una atención no contamina la siguiente** | Tras usarla, el catálogo sigue en 50 mg |
+| **La plantilla de urgencias respeta lo que exige el builder** | El Prototype no debilita al Builder: sin triaje se rechaza igual |
+| Guarda una plantilla nueva a partir de una nota existente | El «guardar como plantilla» del médico |
+| **La plantilla guardada no arrastra la historia del paciente** | Verificado sobre el JSON completo: sin anamnesis, antecedentes ni hallazgos (*copy-forward*) |
+| La plantilla guardada aparece en el catálogo y se puede usar | Ciclo completo: crear, listar, aplicar |
+| No se admiten dos plantillas con la misma clave | Integridad del catálogo |
+| Guardar y aplicar una plantilla quedan auditados | Integración con el Singleton |
+
+**Resultado**
+
+```
+Tests:    25 passed (96 assertions)
+```
+
+---
+
+# Validación de las pruebas
+
+Las 110 pruebas del proyecto se ejecutan con un solo comando:
+
+```bash
+cd backend
+composer install
+php artisan test
+```
+
+**Resultado**
+
+```
+Tests:    110 passed (403 assertions)
+```
+
+| Patrón | Pruebas | Aserciones | Clases de prueba |
+|---|---:|---:|---|
+| Singleton | 9 | 28 | `AuditLoggerSingletonTest`, `AuthAuditTest` |
+| Factory Method | 24 | 74 | `DeviceReadingFactoryTest`, `DeviceReadingIngestionTest` |
+| Abstract Factory | 18 | 76 | `ClinicalExchangeFactoryTest`, `ClinicalExportTest` |
+| Builder | 28 | 111 | `ClinicalNoteBuilderTest`, `ClinicalEncounterTest` |
+| Prototype | 25 | 96 | `EncounterTemplatePrototypeTest`, `ClinicalTemplateTest` |
+| **Subtotal patrones** | **104** | **385** | |
+| Otras (panel, autenticación base) | 6 | 18 | `PanelTest`, `ExampleTest` |
+| **Total** | **110** | **403** | |
+
+Cada patrón se prueba en dos niveles: las **unitarias** verifican la mecánica
+del patrón (que el constructor sea privado, que la copia sea profunda, que el
+método fábrica sea abstracto) y las de **integración** verifican que funciona de
+extremo a extremo a través de la API real, contra base de datos.
+
+> **Nota sobre la ejecución:** la imagen de Docker se construye sin dependencias
+> de desarrollo, así que PHPUnit no está dentro del contenedor. Para ejecutar las
+> pruebas hace falta PHP 8.3 y Composer en la máquina. Las instrucciones
+> completas de puesta en marcha están en `COMO_EJECUTAR_EL_PROYECTO.md`.
+
+---
 
 # UML global del proyecto
 
