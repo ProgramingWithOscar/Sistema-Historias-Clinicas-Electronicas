@@ -1,7 +1,5 @@
 <div align="center">
 
-# Sistema de Historias Clínicas Electrónicas
-
 # Sistema Historias Clínicas Electronicas 🫆
 Proyecto para la gestión de pacientes, citas, diagnósticos y tratamientos.
 Integración con dispositivos IoT
