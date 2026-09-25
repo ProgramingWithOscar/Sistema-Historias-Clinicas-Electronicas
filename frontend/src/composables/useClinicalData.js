@@ -11,6 +11,7 @@ const exportacion = ref(null)
 const encounters = ref([])
 const encounterTypes = ref([])
 const templates = ref([])
+const interactionSources = ref([])
 const error = ref(null)
 
 async function cargar(recurso, destino) {
@@ -33,6 +34,7 @@ export function useClinicalData() {
     encounters,
     encounterTypes,
     templates,
+    interactionSources,
     error,
 
     criticas: computed(() => readings.value.filter((r) => r.severity === 'critical').length),
@@ -45,6 +47,19 @@ export function useClinicalData() {
     cargarAtenciones: () => cargar('/clinical-encounters', encounters),
     cargarTiposAtencion: () => cargar('/encounter-types', encounterTypes),
     cargarPlantillas: () => cargar('/encounter-templates', templates),
+    cargarFuentesInteracciones: () => cargar('/interaction-sources', interactionSources),
+
+    /**
+     * Verifica interacciones. El cuerpo es idéntico sea cual sea la fuente: el
+     * adaptador del backend absorbe las diferencias entre proveedores.
+     */
+    async verificarInteracciones(drugs, source = null) {
+      const { data } = await api('/interaction-checks', {
+        method: 'POST',
+        body: { drugs, ...(source ? { source } : {}) },
+      })
+      return data
+    },
 
     /**
      * Pide el borrador de una plantilla. Cada llamada devuelve una copia

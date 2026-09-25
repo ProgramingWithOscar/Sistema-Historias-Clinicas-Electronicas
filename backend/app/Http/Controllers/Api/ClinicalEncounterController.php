@@ -8,6 +8,9 @@ use App\Models\ClinicalEncounter;
 use App\Models\User;
 use App\Support\Audit\AuditLogger;
 use App\Support\Encounters\EncounterDirectorResolver;
+use App\Support\Encounters\Parts\Prescription;
+use App\Support\Interactions\InteractionCheckerResolver;
+use App\Support\Interactions\InteractionReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,6 +26,7 @@ class ClinicalEncounterController extends Controller
 {
     public function __construct(
         private readonly EncounterDirectorResolver $resolver,
+        private readonly InteractionCheckerResolver $interactions,
     ) {}
 
     /** Tipos de atención disponibles y lo que exige cada uno. */
@@ -45,6 +49,11 @@ class ClinicalEncounterController extends Controller
 
         $encounter = ClinicalEncounter::fromNote($note);
 
+        // La fórmula que acaba de quedar en la historia se verifica contra la
+        // fuente de interacciones (patrón Adapter). La nota ya está guardada: la
+        // alerta informa al profesional, no le bloquea la atención.
+        $report = $this->checkInteractions($note->prescriptions);
+
         AuditLogger::getInstance()->record(
             action: 'hce.encounter.created',
             actorId: $request->user()->id,
@@ -55,11 +64,17 @@ class ClinicalEncounterController extends Controller
                 'patient_id' => $note->patientId,
                 'primary_diagnosis' => $note->primaryDiagnosis()?->code,
                 'prescriptions' => count($note->prescriptions),
+                'interaction_warning' => $report?->mostSevere()?->severity->value,
             ],
             request: $request,
         );
 
-        return response()->json(['data' => $this->present($encounter)], 201);
+        return response()->json([
+            'data' => [
+                ...$this->present($encounter),
+                'interactions' => $report?->toArray(),
+            ],
+        ], 201);
     }
 
     /** Últimas notas registradas, de más reciente a más antigua. */
@@ -76,6 +91,28 @@ class ClinicalEncounterController extends Controller
             ->map(fn (ClinicalEncounter $encounter) => $this->present($encounter));
 
         return response()->json(['data' => $encounters]);
+    }
+
+    /**
+     * Verifica las prescripciones de la nota, si hay al menos dos.
+     *
+     * Devuelve `null` cuando no hay nada que comparar, para distinguir «no se
+     * verificó» de «se verificó y salió limpio».
+     *
+     * @param  list<Prescription>  $prescriptions
+     */
+    private function checkInteractions(array $prescriptions): ?InteractionReport
+    {
+        $principios = array_values(array_unique(array_map(
+            fn (Prescription $p) => $p->activeIngredient,
+            $prescriptions,
+        )));
+
+        if (count($principios) < 2) {
+            return null;
+        }
+
+        return $this->interactions->for()->check($principios);
     }
 
     /**

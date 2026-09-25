@@ -1706,6 +1706,357 @@ extremo a extremo a través de la API real, contra base de datos.
 
 ---
 
+## Patrón de Diseño: Adapter
+
+### ¿Por qué Adapter en este proyecto?
+
+Los cinco patrones anteriores son **creacionales**: responden a *cómo se crea*
+un objeto. El Adapter es **estructural**: responde a *cómo se conectan* objetos
+que ya existen y no se hablan.
+
+El **objetivo específico 3** del proyecto pide un motor de alertas de
+interacciones medicamentosas. Y ahí aparece un problema que ningún patrón
+creacional resuelve: **los datos de interacciones no son nuestros**. Vienen del
+servicio de la National Library of Medicine, de un vademécum que entrega la
+institución en CSV, o de la base de datos de un proveedor privado. Cada uno
+tiene la interfaz que su autor decidió:
+
+| | RxNav (NLM) | Vademécum institucional |
+|---|---|---|
+| Qué recibe | códigos **RxCUI numéricos** | **un nombre** de principio activo a la vez |
+| Qué devuelve | JSON anidado en inglés | filas planas con encabezados en español |
+| Escala de gravedad | `high` / `moderate` / `low` | `grave` / `moderada` / `leve` |
+| Disponibilidad | depende de la red | archivo local |
+
+Ninguna de las dos se puede cambiar: no son código nuestro. Y adaptar el
+sistema para hablar como ellas significaría reescribirlo cada vez que la
+institución cambie de proveedor —y dejar el nombre `RxNavClient` esparcido por
+el builder, el controlador y la interfaz—.
+
+El Adapter resuelve exactamente eso: una clase por fuente que traduce en ambos
+sentidos, de modo que todas caben por la misma puerta.
+
+### Casos de uso concretos
+
+*1. Verificación de interacciones medicamentosas (implementado)*
+Dos adaptadores hacen que RxNav y el vademécum en CSV cumplan el mismo contrato
+`DrugInteractionChecker`. Cambiar de proveedor es escribir un adaptador nuevo.
+
+*2. SDK de fabricantes de dispositivos médicos*
+Un glucómetro con SDK propio (`AccuChekSdk::readMemory()`) puede hacerse pasar
+por el producto `ClinicalReading` del Factory Method sin tocar el módulo IoT.
+
+*3. Importación de historias clínicas de otro prestador*
+El espejo del Abstract Factory: un `FhirBundleAdapter` haría que un documento
+FHIR ajeno se comporte como las observaciones internas del sistema.
+
+### PATRON DE DISEÑO ADAPTER
+
+## Diagrama UML
+
+```mermaid
+classDiagram
+    direction TB
+
+    class DrugInteractionChecker {
+        <<interface Target>>
+        +check(activeIngredients) InteractionReport
+        +source() string
+    }
+
+    class VademecumInteractionAdapter {
+        <<Adapter>>
+        -vademecum VademecumNacionalReader
+        +check(activeIngredients) InteractionReport
+        +source() string
+        -traducirGravedad(gravedad) InteractionSeverity
+    }
+
+    class RxNavInteractionAdapter {
+        <<Adapter>>
+        -rxnav RxNavClient
+        +check(activeIngredients) InteractionReport
+        +source() string
+        -aRxcui(principio) int
+        -aInteracciones(crudo, porCodigo) List~DrugInteraction~
+        -nombreLocal(concepto, porCodigo) string
+        -traducirGravedad(severity) InteractionSeverity
+    }
+
+    class VademecumNacionalReader {
+        <<Adaptee — CSV local>>
+        -rutaCsv string
+        +buscarPorPrincipio(principio) array
+        +principiosConocidos() array
+        +normalizar(texto) string
+    }
+
+    class RxNavClient {
+        <<Adaptee — API externo>>
+        +findInteractionsFromList(rxcuis) array
+    }
+
+    class InteractionReport {
+        +interactions List~DrugInteraction~
+        +checkedDrugs array
+        +source string
+        +hasWarnings() bool
+        +mostSevere() DrugInteraction
+        +sorted() List~DrugInteraction~
+        +toArray() array
+    }
+
+    class DrugInteraction {
+        +drugA string
+        +drugB string
+        +severity InteractionSeverity
+        +description string
+        +source string
+        +pairKey() string
+    }
+
+    class InteractionSeverity {
+        <<enumeration>>
+        Leve
+        Moderada
+        Grave
+        Contraindicada
+        +requiresAttention() bool
+        +weight() int
+    }
+
+    class InteractionCheckerResolver {
+        +for(source) DrugInteractionChecker
+        +supportedSources() array
+        +catalog() array
+    }
+
+    class InteractionCheckController {
+        <<cliente>>
+        +sources() JsonResponse
+        +store(request) JsonResponse
+    }
+
+    DrugInteractionChecker <|.. VademecumInteractionAdapter : implementa
+    DrugInteractionChecker <|.. RxNavInteractionAdapter : implementa
+
+    VademecumInteractionAdapter o-- VademecumNacionalReader : envuelve
+    RxNavInteractionAdapter o-- RxNavClient : envuelve
+
+    VademecumInteractionAdapter ..> InteractionReport : traduce la salida
+    RxNavInteractionAdapter ..> InteractionReport : traduce la salida
+
+    InteractionReport "1" *-- "0..n" DrugInteraction
+    DrugInteraction ..> InteractionSeverity : clasifica
+
+    InteractionCheckerResolver ..> DrugInteractionChecker : elige la fuente
+    InteractionCheckController ..> InteractionCheckerResolver : for(source)
+```
+
+Las dos relaciones que definen el patrón son las de **agregación** (rombo
+hueco) entre cada adaptador y su adaptee: el adaptador **envuelve** al objeto
+ajeno, no hereda de él. Es la variante de *adaptador de objeto*, la recomendada,
+porque permite envolver clases `final`, sustituir el adaptee en pruebas y no
+arrastrar la interfaz del proveedor.
+
+Nótese también lo que **no** hay en el diagrama: ninguna flecha desde
+`InteractionCheckController` hacia `RxNavClient` o `VademecumNacionalReader`. El
+cliente sólo conoce la interfaz de la izquierda.
+
+## ¿ Donde de usa ?
+
+> **Implementación:** el patrón adapter está implementado en la interfaz
+> `DrugInteractionChecker`
+> (`backend/app/Support/Interactions/Contracts/DrugInteractionChecker.php`), los
+> dos adaptadores (`VademecumInteractionAdapter`, `RxNavInteractionAdapter`) y
+> los dos adaptees que envuelven (`VademecumNacionalReader`, `RxNavClient`). Se
+> usa desde `InteractionCheckController`.
+
+El **Target**: la interfaz que el sistema quiere usar.
+
+```php
+interface DrugInteractionChecker
+{
+    /** Recibe nombres de principio activo y devuelve el informe del sistema. */
+    public function check(array $activeIngredients): InteractionReport;
+
+    /** Identificador de la fuente, para poder trazar quién respondió qué. */
+    public function source(): string;
+}
+```
+
+El **Adaptee**: la clase ajena, con la firma que decidió su autor. No implementa
+nada nuestro —si lo hiciera, no haría falta adaptador—.
+
+```php
+final class RxNavClient
+{
+    /** Pide códigos RxCUI numéricos, no nombres. */
+    public function findInteractionsFromList(array $rxcuis): array
+    {
+        $response = Http::timeout(config('interactions.rxnav.timeout'))
+            ->acceptJson()
+            ->get(self::BASE_URL.'/interaction/list.json', [
+                'rxcuis' => implode('+', $rxcuis),
+            ]);
+
+        return $response->successful() ? $response->json() ?? [] : [];
+    }
+}
+```
+
+El **Adapter**: salva los tres desajustes —argumentos, nombre de la llamada y
+formato de la respuesta—.
+
+```php
+final class RxNavInteractionAdapter implements DrugInteractionChecker
+{
+    // COMPOSICIÓN, no herencia: envuelve al adaptee.
+    public function __construct(private readonly RxNavClient $rxnav) {}
+
+    public function check(array $activeIngredients): InteractionReport
+    {
+        // 1. Traducir la ENTRADA: «Losartán» -> 52175
+        $porCodigo = [];
+
+        foreach ($activeIngredients as $principio) {
+            $codigo = $this->aRxcui($principio);
+
+            if ($codigo !== null) {
+                $porCodigo[$codigo] = $principio;
+            }
+        }
+
+        // Un fármaco que la fuente no conoce no puede interactuar con nada:
+        // se informa vacío en vez de fingir que no hay riesgo.
+        if (count($porCodigo) < 2) {
+            return InteractionReport::empty($activeIngredients, $this->source());
+        }
+
+        // 2. Llamar al adaptee con SU firma.
+        $crudo = $this->rxnav->findInteractionsFromList(array_keys($porCodigo));
+
+        // 3. Traducir la SALIDA a nuestro vocabulario.
+        return new InteractionReport(
+            interactions: $this->aInteracciones($crudo, $porCodigo),
+            checkedDrugs: $activeIngredients,
+            source: $this->source(),
+            checkedAt: Carbon::now(),
+        );
+    }
+
+    /** Escala del proveedor -> escala del sistema. */
+    private function traducirGravedad(string $severity): InteractionSeverity
+    {
+        return match (mb_strtolower(trim($severity))) {
+            'contraindicated' => InteractionSeverity::Contraindicada,
+            'high' => InteractionSeverity::Grave,
+            'moderate' => InteractionSeverity::Moderada,
+            'low', 'minor' => InteractionSeverity::Leve,
+            // Una gravedad que no sabemos leer se trata como moderada: en
+            // seguridad del paciente, el silencio es peor que una alerta de más.
+            default => InteractionSeverity::Moderada,
+        };
+    }
+}
+```
+
+El segundo adaptador resuelve un desajuste **distinto**: el del flujo. El lector
+del CSV sólo sabe buscar un fármaco a la vez y devuelve filas que pueden
+referirse a medicamentos que el paciente no toma.
+
+```php
+final class VademecumInteractionAdapter implements DrugInteractionChecker
+{
+    public function check(array $activeIngredients): InteractionReport
+    {
+        $enFormula = array_map(fn ($p) => $this->vademecum->normalizar($p), $activeIngredients);
+        $encontradas = [];
+
+        foreach ($activeIngredients as $principio) {
+            foreach ($this->vademecum->buscarPorPrincipio($principio) as $fila) {
+                $a = $this->vademecum->normalizar($fila['principio_a']);
+                $b = $this->vademecum->normalizar($fila['principio_b']);
+
+                // El CSV conoce interacciones con medio mundo: sólo interesan
+                // las que involucran a dos fármacos de ESTA fórmula.
+                if (! in_array($a, $enFormula, true) || ! in_array($b, $enFormula, true)) {
+                    continue;
+                }
+
+                $interaccion = new DrugInteraction(/* … */);
+
+                // Cada par sale dos veces, una por cada extremo consultado.
+                $encontradas[$interaccion->pairKey()] = $interaccion;
+            }
+        }
+
+        return new InteractionReport(/* … */);
+    }
+}
+```
+
+Y así lo consume el controlador, sin saber que RxNav o el CSV existen:
+
+```php
+$checker = $this->resolver->for($request->input('source'));
+
+$report = $checker->check($request->array('drugs'));
+```
+
+## ¿Para qué se usa?
+
+Para verificar la fórmula de un paciente contra fuentes de datos externas sin
+que el sistema quede atado a ninguna. Hoy funciona a través de los endpoints
+`GET /api/interaction-sources` y `POST /api/interaction-checks`, con dos fuentes
+intercambiables y 20 interacciones cargadas en el vademécum institucional
+(`backend/database/data/vademecum-interacciones.csv`).
+
+| Fuente | Origen | Requiere red |
+|---|---|---|
+| `vademecum` | CSV entregado por el prestador | No — es la fuente por defecto |
+| `rxnav` | Servicio web de la National Library of Medicine | Sí |
+
+Las interacciones se devuelven ordenadas de más grave a menos, con la escala
+propia del sistema (leve, moderada, grave, contraindicada) y la fuente que
+reportó cada hallazgo —dato exigible en una auditoría clínica—. Cada
+verificación queda auditada por el Singleton con la acción
+`hce.interaction.checked`.
+
+## ¿Por qué tiene que ser Adapter?
+
+Porque el problema no es crear un objeto, sino **conectar dos interfaces que no
+encajan y que no se pueden modificar**:
+
+- **El adaptee no es nuestro.** `RxNavClient` tiene la firma que la NLM
+  publicó. No se puede añadirle `implements DrugInteractionChecker` — y si se
+  pudiera, el adaptador no haría falta. La prueba
+  `el_adaptee_no_implementa_el_contrato_del_sistema` verifica justamente esa
+  premisa.
+- **Aísla la dependencia externa.** El nombre `RxNavClient` aparece en un solo
+  archivo. Cambiar de proveedor es escribir otro adaptador y registrar una línea
+  en el resolver: el controlador, la ruta y la interfaz no se tocan.
+- **Permite probar sin red.** Al depender de la interfaz y no del cliente HTTP,
+  las pruebas sustituyen la fuente y corren sin salir a internet.
+- **Contiene el fallo del tercero.** Si el servicio externo se cae, el
+  adaptador devuelve un informe vacío en lugar de propagar la excepción: la
+  atención clínica no puede detenerse porque un API ajeno no responda.
+
+Y sobre todo, porque **el adaptador no añade funcionalidad, sólo traduce**. Ésa
+es la diferencia con los otros dos patrones estructurales que se le parecen:
+
+| Patrón | Qué hace con la interfaz |
+|---|---|
+| **Adapter** | La **cambia** — misma funcionalidad, otra forma |
+| **Decorator** | La **mantiene** — añade comportamiento encima |
+| **Facade** | La **simplifica** — una puerta sencilla a un subsistema complejo |
+
+Frente al Factory Method que ya tiene el módulo IoT la distinción es igual de
+clara: `DeviceReadingFactory` normaliza payloads que **nosotros** diseñamos
+—nosotros decidimos que el glucómetro manda `mg_dl`—, mientras que el Adapter
+trabaja con formatos que **vienen impuestos**. Por eso conviven sin solaparse.
+
+
 # UML global del proyecto
 
 ## Arquitectura por capas y módulos
@@ -1715,7 +2066,7 @@ flowchart TB
     subgraph FE["Frontend · Vue 3 + Vite"]
         direction TB
         Shell["AppShell<br/>navegación por secciones"]
-        Vistas["OverviewView · DeviceReadingsView · EncountersView<br/>InteroperabilityView · SessionsView · AuditView"]
+        Vistas["OverviewView · DeviceReadingsView · EncountersView<br/>InteractionsView · InteroperabilityView · SessionsView · AuditView"]
         ApiJs["services/api.js<br/>Sanctum (cookie de sesión + CSRF)"]
         Shell --> Vistas --> ApiJs
     end
@@ -1726,6 +2077,7 @@ flowchart TB
         DevC["DeviceReadingController"]
         EncC["ClinicalEncounterController"]
         TplC["ClinicalTemplateController"]
+        IntC["InteractionCheckController"]
         ExpC["ClinicalExportController"]
         AudC["AuditLogController"]
     end
@@ -1737,6 +2089,13 @@ flowchart TB
         S3["Encounters/ — BUILDER<br/>ClinicalNoteBuilder + Directores"]
         S4["Templates/ — PROTOTYPE<br/>EncounterTemplate + TemplateRegistry"]
         S5["Interop/ — ABSTRACT FACTORY<br/>ClinicalExchangeFactory + 3 familias"]
+        S6["Interactions/ — ADAPTER<br/>DrugInteractionChecker + 2 adaptadores"]
+    end
+
+    subgraph EXT["Fuentes externas — código que no controlamos"]
+        direction LR
+        X1["RxNav · National Library of Medicine<br/>códigos RxCUI, respuesta en inglés"]
+        X2["Vademécum institucional<br/>archivo CSV local"]
     end
 
     subgraph DB["Persistencia · MySQL 8.4"]
@@ -1755,12 +2114,17 @@ flowchart TB
     DevC --> S2
     EncC --> S3
     TplC --> S4
+    IntC --> S6
     ExpC --> S5
 
     S2 -.audita.-> S1
     S3 -.signos vitales.-> S2
     S4 -.rellena el payload.-> S3
     S5 -.observaciones.-> S2
+    EncC -.verifica la fórmula.-> S6
+
+    S6 -->|adaptador| X1
+    S6 -->|adaptador| X2
 
     S1 --> T2
     S2 --> T3
@@ -1772,10 +2136,15 @@ flowchart TB
 Las flechas punteadas entre módulos son las que importan: **ningún patrón vive
 aislado**. El Builder toma del Factory Method los signos vitales ya
 normalizados, el Prototype alimenta al Builder con una copia de la plantilla, el
-Abstract Factory exporta esas mismas lecturas, y los cuatro escriben en el
-Singleton de auditoría.
+Abstract Factory exporta esas mismas lecturas, el Adapter verifica la fórmula que
+queda en la nota recién registrada, y todos escriben en el Singleton de
+auditoría.
 
-## Cómo se encadenan los cinco patrones
+El subgrafo de la derecha es lo que distingue al Adapter de los cinco
+creacionales: es el único módulo que se comunica con **código que no es
+nuestro**, y por eso es el único que necesita traductores.
+
+## Cómo se encadenan los seis patrones
 
 ```mermaid
 classDiagram
@@ -1822,6 +2191,22 @@ classDiagram
         +export(patient, request, limit) array
     }
 
+    class DrugInteractionChecker {
+        <<Adapter — Target>>
+        +check(activeIngredients) InteractionReport
+        +source() string
+    }
+
+    class RxNavClient {
+        <<Adaptee externo>>
+        +findInteractionsFromList(rxcuis) array
+    }
+
+    class VademecumNacionalReader {
+        <<Adaptee externo>>
+        +buscarPorPrincipio(principio) array
+    }
+
     class User {
         <<Eloquent>>
     }
@@ -1850,6 +2235,9 @@ classDiagram
     class ClinicalExportController {
         <<API>>
     }
+    class InteractionCheckController {
+        <<API>>
+    }
     class AuthController {
         <<API>>
     }
@@ -1874,6 +2262,12 @@ classDiagram
     ClinicalEncounterController ..> AuditLogger : hce.encounter.created
     ClinicalTemplateController ..> AuditLogger : hce.template.saved
     ClinicalRecordExporter ..> AuditLogger : hce.export.generated
+    InteractionCheckController ..> AuditLogger : hce.interaction.checked
     AuthController ..> AuditLogger : auth.login.succeeded
     AuditLogger --> AuditLog : persiste el evento
+
+    InteractionCheckController ..> DrugInteractionChecker : verifica una fórmula
+    ClinicalEncounterController ..> DrugInteractionChecker : verifica la fórmula de la nota
+    DrugInteractionChecker ..> RxNavClient : un adaptador lo envuelve
+    DrugInteractionChecker ..> VademecumNacionalReader : el otro adaptador lo envuelve
 ```

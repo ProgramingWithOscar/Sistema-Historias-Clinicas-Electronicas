@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ClinicalEncounterController;
 use App\Http\Controllers\Api\ClinicalExportController;
 use App\Http\Controllers\Api\ClinicalTemplateController;
 use App\Http\Controllers\Api\DeviceReadingController;
+use App\Http\Controllers\Api\InteractionCheckController;
 use App\Http\Controllers\Api\PingController;
 use App\Http\Controllers\Api\SessionController;
 use Illuminate\Http\Request;
@@ -43,6 +44,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/encounter-templates', [ClinicalTemplateController::class, 'index']);
     Route::get('/encounter-templates/{key}/draft', [ClinicalTemplateController::class, 'draft']);
     Route::post('/encounter-templates', [ClinicalTemplateController::class, 'store']);
+
+    // Interacciones medicamentosas: el patrón Adapter hace que fuentes con
+    // interfaces incompatibles quepan por el mismo contrato.
+    Route::get('/interaction-sources', [InteractionCheckController::class, 'sources']);
+    Route::post('/interaction-checks', [InteractionCheckController::class, 'store']);
 
     Route::get('/user', function (Request $request) {
         return $request->user();

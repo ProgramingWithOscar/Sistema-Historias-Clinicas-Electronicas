@@ -31,6 +31,13 @@ const sections = [
     description: 'Historias armadas paso a paso por el patrón Builder.',
   },
   {
+    id: 'interactions',
+    label: 'Interacciones',
+    icon: 'pill',
+    title: 'Interacciones medicamentosas',
+    description: 'Fuentes externas unificadas por el patrón Adapter.',
+  },
+  {
     id: 'interop',
     label: 'Interoperabilidad',
     icon: 'share',

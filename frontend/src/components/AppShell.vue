@@ -54,6 +54,7 @@ const iniciales = (nombre) =>
           <li>Abstract Factory</li>
           <li>Builder</li>
           <li>Prototype</li>
+          <li>Adapter</li>
         </ul>
       </div>
     </aside>

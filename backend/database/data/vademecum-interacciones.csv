@@ -1,0 +1,21 @@
+principio_a,principio_b,gravedad,descripcion
+Losartán,Ibuprofeno,moderada,Los AINE reducen el efecto antihipertensivo del losartán y aumentan el riesgo de deterioro de la función renal. Vigilar presión arterial y creatinina.
+Losartán,Espironolactona,grave,Riesgo de hiperpotasemia grave por doble bloqueo del sistema renina-angiotensina-aldosterona. Control estrecho de potasio sérico.
+Losartán,Litio,grave,El losartán reduce la excreción renal de litio y puede provocar toxicidad. Monitorizar litemia.
+Captopril,Ibuprofeno,moderada,Los AINE antagonizan el efecto antihipertensivo del captopril y pueden precipitar falla renal aguda en pacientes deshidratados.
+Captopril,Espironolactona,grave,Riesgo de hiperpotasemia por acción combinada sobre el eje renina-angiotensina-aldosterona.
+Enalapril,Espironolactona,grave,Riesgo de hiperpotasemia. Requiere control de potasio y función renal.
+Warfarina,Ácido acetilsalicílico,grave,Efecto antitrombótico aditivo con aumento marcado del riesgo de sangrado mayor. Evitar la combinación salvo indicación expresa.
+Warfarina,Acetaminofén,moderada,El uso sostenido de acetaminofén potencia el efecto anticoagulante de la warfarina. Controlar INR si se prolonga más de tres días.
+Warfarina,Ibuprofeno,grave,Riesgo de hemorragia digestiva por efecto antiagregante y lesión de mucosa sumados a la anticoagulación.
+Metformina,Contraste yodado,grave,Riesgo de acidosis láctica por deterioro agudo de la función renal. Suspender metformina antes del procedimiento.
+Metformina,Glibenclamida,moderada,Efecto hipoglucemiante aditivo. Ajustar dosis y reforzar el automonitoreo de glucemia.
+Clopidogrel,Omeprazol,moderada,El omeprazol inhibe el CYP2C19 y reduce la activación del clopidogrel, disminuyendo su efecto antiagregante.
+Atorvastatina,Claritromicina,grave,La claritromicina inhibe el CYP3A4 y multiplica la concentración de atorvastatina, con riesgo de rabdomiólisis.
+Amiodarona,Warfarina,grave,La amiodarona inhibe el metabolismo de la warfarina y eleva el INR de forma sostenida. Reducir dosis y controlar INR.
+Digoxina,Espironolactona,moderada,La espironolactona reduce la depuración de digoxina y puede elevar sus niveles séricos.
+Simvastatina,Amlodipino,moderada,El amlodipino aumenta la exposición a simvastatina. No superar 20 mg diarios de simvastatina.
+Tramadol,Fluoxetina,grave,Riesgo de síndrome serotoninérgico y descenso del umbral convulsivo.
+Acetaminofén,Ibuprofeno,leve,Asociación de uso frecuente y aceptado para el manejo del dolor. Sin interacción de relevancia clínica a dosis habituales.
+Sildenafil,Nitroglicerina,contraindicada,Hipotensión grave y potencialmente mortal por vasodilatación aditiva. Combinación absolutamente contraindicada.
+Metotrexato,Trimetoprim,contraindicada,Toxicidad hematológica grave por antagonismo del folato sumado. Combinación contraindicada.

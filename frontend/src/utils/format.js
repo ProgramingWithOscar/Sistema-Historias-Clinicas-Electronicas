@@ -24,6 +24,7 @@ export const acciones = {
   'hce.encounter.created': 'Nota de atención registrada',
   'hce.template.applied': 'Plantilla aplicada',
   'hce.template.saved': 'Plantilla guardada',
+  'hce.interaction.checked': 'Interacciones verificadas',
 }
 
 /** Tipos de atención que atiende el resolver de directores del backend. */

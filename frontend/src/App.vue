@@ -5,6 +5,7 @@ import LoginForm from './components/LoginForm.vue'
 import AuditView from './components/views/AuditView.vue'
 import DeviceReadingsView from './components/views/DeviceReadingsView.vue'
 import EncountersView from './components/views/EncountersView.vue'
+import InteractionsView from './components/views/InteractionsView.vue'
 import InteroperabilityView from './components/views/InteroperabilityView.vue'
 import OverviewView from './components/views/OverviewView.vue'
 import SessionsView from './components/views/SessionsView.vue'
@@ -19,6 +20,7 @@ const vistas = {
   overview: OverviewView,
   readings: DeviceReadingsView,
   encounters: EncountersView,
+  interactions: InteractionsView,
   interop: InteroperabilityView,
   sessions: SessionsView,
   audit: AuditView,
